@@ -80,8 +80,8 @@ public enum PlanarGraph {
         // 5. 반간선 순회로 면 추출
         var visited = Set<HalfEdge>()
         var cycles: [(polygon: Polygon, signed: Double, vertices: [Int])] = []
-        for (u, ns) in sorted {
-            for v in ns {
+        for u in sorted.keys.sorted() {
+            for v in sorted[u]! {
                 let start = HalfEdge(u, v)
                 if visited.contains(start) { continue }
                 var cycle: [Int] = []
@@ -109,8 +109,20 @@ public enum PlanarGraph {
         var inner = cycles.filter { $0.signed.sign != outerSign }.map(\.polygon)
         // 같은 성분의 외곽 면들 중 하나만 고른 경우, 단일 면 그래프면 내부 면이 외곽과 같다.
         if inner.isEmpty { inner = [outerCycle.polygon] }
-        inner.sort { $0.area > $1.area }
-        return PlanarFaces(outer: Polygon(outerCycle.polygon.vertices).simplified(), faces: inner.map { $0.simplified() })
+        // 결과를 결정적으로: 다각형은 정규형, 같은 면적은 위치순.
+        let faces = inner.map { canonical($0.simplified()) }.sorted {
+            if abs($0.area - $1.area) > 1e-6 { return $0.area > $1.area }
+            return ($0.centroid.y, $0.centroid.x) < ($1.centroid.y, $1.centroid.x)
+        }
+        return PlanarFaces(outer: canonical(outerCycle.polygon.simplified()), faces: faces)
+    }
+
+    /// 시작 꼭짓점 = (y, x) 가 가장 작은 점, 방향 = 양의 부호 면적.
+    static func canonical(_ p: Polygon) -> Polygon {
+        var v = p.vertices
+        if p.signedArea < 0 { v.reverse() }
+        guard let i = v.indices.min(by: { (v[$0].y, v[$0].x) < (v[$1].y, v[$1].x) }) else { return p }
+        return Polygon(Array(v[i...] + v[..<i]))
     }
 
     static func param(of p: Point, on s: Segment) -> Double {

@@ -71,7 +71,8 @@ public enum ScaleEstimator {
             return (s, item.text)
         }
         let counts = Dictionary(grouping: snapped, by: \.0)
-        guard let (best, items) = counts.max(by: { $0.value.count < $1.value.count }), items.count >= 2 else { return nil }
+        // 지지 수가 같으면 작은 축척 번호를 고른다(사전 순회 순서에 따른 비결정성 제거).
+        guard let (best, items) = counts.max(by: { ($0.value.count, -$0.key) < ($1.value.count, -$1.key) }), items.count >= 2 else { return nil }
         return ScaleEstimate(
             ratio: best,
             source: .dimensions,

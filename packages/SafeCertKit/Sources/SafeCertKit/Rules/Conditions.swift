@@ -44,8 +44,9 @@ public struct Conditions: Hashable, Codable, Sendable {
     /// 주된 출입구 외에 영업장 내부에서 피난층·지상으로 통하는 직통계단이 따로 있는가.
     public var hasSeparateDirectStair: Tri
 
+    /// 도면에 없는 값의 기본은 「모름」(U-07: 도면에 없는 값은 공란이 기본).
     public init(isMultiUseBusiness: Bool = true, businessType: BusinessType = .restaurant, isEvacuationFloor: Tri = .unknown,
-                isExistingBusiness: Tri = .no, hasSeparateDirectStair: Tri = .no) {
+                isExistingBusiness: Tri = .unknown, hasSeparateDirectStair: Tri = .unknown) {
         self.isMultiUseBusiness = isMultiUseBusiness
         self.businessType = businessType
         self.isEvacuationFloor = isEvacuationFloor

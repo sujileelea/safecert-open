@@ -90,6 +90,16 @@ public enum RuleEngine {
             ReadValue("예외 나목 출입구까지 수평거리", "\(crit["exemptionB.maxDistance"]?.display ?? "-") 이하", .lawCriterion)
         ]
 
+        // 출입구를 하나도 식별하지 못하면 「비상구 없음」으로 단정하지 않는다.
+        guard !plan.exteriorDoors.isEmpty else {
+            v.color = .orange
+            v.badge = .expertCheck
+            v.summary = "출입구를 식별하지 못함 — 판정 보류"
+            v.readValues.append(ReadValue("외부 출입문", "식별 못 함", .drawingExtracted))
+            v.checkItems.append("도면에서 문(문짝 선 + 열림 궤적)을 찾지 못했다. 문이 그려진 CAD 출력 PDF 인지, 주출입구·비상구 표기가 있는지 확인한다.")
+            return [v]
+        }
+
         let exits = plan.emergencyExits
         v.readValues.append(ReadValue("비상구", exits.isEmpty ? "없음" : exits.map { $0.label ?? $0.id }.joined(separator: ", "), .drawingExtracted))
         v.readValues.append(ReadValue("주된 출입구", plan.mainEntrances.isEmpty ? "미식별" : plan.mainEntrances.map { $0.label ?? $0.id }.joined(separator: ", "), .drawingExtracted))
@@ -122,13 +132,24 @@ public enum RuleEngine {
             if let boundary = plan.boundary, let scale = ctx.confirmedScale,
                let maxArea = crit["exemptionB.maxArea"]?.number, let maxDist = crit["exemptionB.maxDistance"]?.number {
                 let area = scale.squareMeters(boundary.area)
-                let doors = plan.exteriorDoors.map(\.center)
-                let farthest = boundary.vertices.map { p in doors.map { scale.meters($0.distance(to: p)) }.min() ?? .infinity }.max() ?? .infinity
+                let perimeter = scale.meters(boundary.edges.reduce(0) { $0 + $1.length })
+                let farthest = farthestDistance(in: boundary, to: plan.exteriorDoors.map(\.center), scale: scale)
+                // 경계 허용 폭: 면적 = 둘레 × 작도 오차, 거리 = 작도 오차 2배(최소 5cm)
+                let areaTol = perimeter * scale.resolutionMeters
+                let distTol = max(scale.resolutionMeters * 2, 0.05)
                 v.readValues.append(ReadValue("영업장 바닥면적", fmt(area, "㎡"), .drawingComputed))
                 v.readValues.append(ReadValue("구획된 실", plan.rooms.isEmpty ? "없음" : "\(plan.rooms.count)개", .drawingComputed))
                 v.readValues.append(ReadValue("가장 먼 부분 → 출입구 수평거리", fmt(farthest, "m"), .drawingComputed))
-                if area <= maxArea && plan.rooms.isEmpty && farthest <= maxDist {
+                let clearlyOut = !plan.rooms.isEmpty || area > maxArea + areaTol || farthest > maxDist + distTol
+                let clearlyIn = plan.rooms.isEmpty && area <= maxArea - areaTol && farthest <= maxDist - distTol
+                if clearlyOut && ctx.detectionConfident {
+                    // 예외 나목 비해당(확정)
+                } else if clearlyIn && ctx.detectionConfident {
                     exempt = "피난층·바닥면적 \(fmt(area, "㎡"))·구획된 실 없음·최대 수평거리 \(fmt(farthest, "m")) — 예외 나목 해당"
+                } else if !ctx.detectionConfident {
+                    undecided.append("영업장 외곽선을 추정했다(벽이 닫히지 않음). 면적·구획된 실을 확인해야 예외 나목을 판단할 수 있다.")
+                } else {
+                    undecided.append("면적 \(fmt(area, "㎡"))·수평거리 \(fmt(farthest, "m"))가 예외 나목 기준의 도면 오차 범위 안이다. 현장 실측으로 확인한다.")
                 }
             } else {
                 undecided.append("축척이 확인되지 않아 예외 나목(면적·수평거리)을 계산하지 못했다.")
@@ -136,6 +157,8 @@ public enum RuleEngine {
         }
 
         // 예외 가목: 별도 직통계단
+        v.readValues.append(ReadValue("별도 직통계단", ctx.conditions.hasSeparateDirectStair.displayName, .userInput))
+        v.readValues.append(ReadValue("기존 업소(고시 기준일 이전 영업)", ctx.conditions.isExistingBusiness.displayName, .userInput))
         switch ctx.conditions.hasSeparateDirectStair {
         case .yes: undecided.append("별도 직통계단이 있다고 입력됐다. 주된 출입구 중심선에서 긴 변 길이의 \(crit["exemptionA.ratio"]?.literal ?? "기준 비율") 이상 떨어져 있는지 확인한다(예외 가목).")
         case .unknown: undecided.append("별도 직통계단 유무 입력이 필요하다(예외 가목).")
@@ -221,12 +244,14 @@ public enum RuleEngine {
             let c = boundary.centroid
             let a1 = (main.center - c).normalized, a2 = (exit.center - c).normalized
             let angle = acos(max(-1, min(1, a1.dot(a2)))) * 180 / .pi
-            let opposite = angle >= 90
+            // 반대방향: 135° 이상만 자동 인정, 90~135° 는 확인 필요, 90° 미만은 같은 쪽.
+            let opposite = angle >= 135
+            let ambiguousSide = angle >= 90 && angle < 135
 
             v.readValues = [
                 ReadValue("주된 출입구 중심 ↔ 비상구 중심 수평거리", fmt(d, "m"), .drawingComputed),
                 ReadValue("영업장 가장 긴 길이(대각선·가로·세로 중 최대)", fmt(L, "m"), .drawingComputed),
-                ReadValue("방향(영업장 중심 기준 사잇각)", "\(Int(angle.rounded()))° · \(opposite ? "반대편" : "같은 쪽")", .drawingComputed)
+                ReadValue("방향(영업장 중심 기준 사잇각)", "\(Int(angle.rounded()))° · \(opposite ? "반대편" : ambiguousSide ? "측면" : "같은 쪽")", .drawingComputed)
             ]
             v.criteria.append(ReadValue("필요 이격거리", "\(fmt(required, "m")) 이상 (\(fmt(L, "m")) × \(ratio.literal))", .lawCriterion))
             let rolesConfident = main.roleConfidence >= 0.9 && exit.roleConfidence >= 0.9 && ctx.detectionConfident
@@ -244,7 +269,7 @@ public enum RuleEngine {
             } else if !opposite {
                 v.color = .orange
                 v.badge = .expertCheck
-                v.summary = "이격거리 충족(\(fmt(d, "m")) ≥ \(fmt(required, "m"))) · 반대방향 아님"
+                v.summary = "이격거리 충족(\(fmt(d, "m")) ≥ \(fmt(required, "m"))) · " + (ambiguousSide ? "반대방향 여부 확인 필요" : "반대방향 아님")
                 v.checkItems.append("반대방향이 아닌 설치는 건물구조상 반대방향에 설치할 수 없는 경우에만 허용된다(같은 호 단서). 사유를 확인한다.")
             } else {
                 v.color = rolesConfident ? .green : .orange
@@ -295,7 +320,8 @@ public enum RuleEngine {
                 v.checkItems.append("축척을 확인하거나 문 규격 표기가 있는 도면이 필요하다.")
                 return v
             }
-            let detection = door.roleConfidence >= 0.9 || door.tag != nil
+            // 빨강은 역할(주된 출입구·비상구)이 표기로 확인된 문에만. 규격 표기는 치수를 확인할 뿐 역할을 확인하지 않는다.
+            let detection = door.roleConfidence >= 0.9
             if w < minW.number - tol {
                 v.color = detection ? .red : .orange
                 v.badge = door.tag != nil ? .autoConfirmed : (ctx.scale?.isCrossValidated == true ? .autoConfirmed : .expertCheck)
@@ -308,8 +334,8 @@ public enum RuleEngine {
                 v.checkItems.append("도면 해상도 오차 안의 경계값이다. 문틀 제외 유효폭을 현장 실측한다.")
             } else if let h = heightCM {
                 if h < minH.number {
-                    v.color = .red
-                    v.badge = .autoConfirmed
+                    v.color = detection ? .red : .orange
+                    v.badge = detection ? .autoConfirmed : .expertCheck
                     v.summary = "세로 \(fmt(h, "cm")) < 기준 \(minH.display)"
                 } else {
                     v.color = .green
@@ -361,6 +387,31 @@ public enum RuleEngine {
             v.lawFlags.append(.relatedNoticeChanged(e.subject))
         }
         return v
+    }
+
+    /// 영업장 각 부분에서 가장 가까운 출입구까지의 수평거리 중 최댓값(m).
+    /// 꼭짓점·변 표본 + 내부 격자(약 0.25m, 최대 약 4천 점)로 잰다.
+    static func farthestDistance(in polygon: Polygon, to doors: [Point], scale: ScaleEstimate) -> Double {
+        guard !doors.isEmpty else { return .infinity }
+        let b = polygon.bounds
+        let step = max(0.25 / scale.metersPerPoint, (b.width * b.height / 4000).squareRoot())
+        var samples = polygon.vertices
+        for e in polygon.edges {
+            let n = max(1, Int(e.length / step))
+            for i in 0..<n { samples.append(e.a + (e.b - e.a) * (Double(i) / Double(n))) }
+        }
+        var y = b.minY + step / 2
+        while y < b.maxY {
+            var x = b.minX + step / 2
+            while x < b.maxX {
+                let p = Point(x, y)
+                if polygon.contains(p) { samples.append(p) }
+                x += step
+            }
+            y += step
+        }
+        let worst = samples.map { p in doors.map { $0.distance(to: p) }.min()! }.max() ?? .infinity
+        return scale.meters(worst)
     }
 
     static func fmt(_ value: Double, _ unit: String) -> String {

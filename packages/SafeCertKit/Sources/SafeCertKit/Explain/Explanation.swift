@@ -33,7 +33,7 @@ public enum ExplanationComposer {
         let citations = v.rule.clauses.compactMap { key -> Citation? in
             guard let c = snapshot.clause(key) else { return nil }
             if key == .noticeExistingGeneral && result.conditions.isExistingBusiness != .yes { return nil }
-            return Citation(key: key, citation: c.citation, layer: c.layer, text: c.text, effectiveDate: c.effectiveDate, lawBaseDate: snapshot.baseDate)
+            return Citation(key: key, citation: c.citation, layer: c.layer, text: c.displayText, effectiveDate: c.effectiveDate, lawBaseDate: snapshot.baseDate)
         }
 
         var sections: [ExplanationSection] = []

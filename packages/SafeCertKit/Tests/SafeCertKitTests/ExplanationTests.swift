@@ -16,7 +16,7 @@ struct ExplanationTests {
         #expect(e.sections.map(\.number) == [1, 2, 3, 4, 5, 6, 7])
         #expect(e.sections[4].lines.contains("검토 상태: 전문가 미확인(감수 전)"))
         let cite = try #require(e.citations.first { $0.key == .ruleExitLocation })
-        #expect(cite.text == snap.clause(.ruleExitLocation)?.text)
+        #expect(cite.text == snap.clause(.ruleExitLocation)?.displayText)
         #expect(e.lawStatus.first?.contains(snap.baseDate) == true)
         #expect(e.sections[0].lines[0].contains("영업장"))
 

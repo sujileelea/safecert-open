@@ -65,12 +65,18 @@ public struct LawClause: Identifiable, Hashable, Codable, Sendable {
     public var wordingFingerprint: String
     /// 이 조문을 실제로 받아온 법령 기준일. 수집 실패로 이어 쓴 조문은 이전 날짜가 남는다.
     public var collectedOn: String?
+    /// API 원문 줄(줄바꿈·띄어쓰기 그대로). 화면 표시용. `text` 는 해석·지문용으로 이어 붙인 글.
+    public var rawLines: [String]?
+
+    /// 화면에 보이는 원문.
+    public var displayText: String { rawLines.map { $0.joined(separator: "\n") } ?? text }
 
     public var id: String { key.rawValue }
     public var citation: String { key.citation }
     public var layer: SourceLayer { key.layer }
 
-    public init(key: ClauseKey, lawName: String, text: String, effectiveDate: String, promulgationDate: String) {
+    public init(key: ClauseKey, lawName: String, text: String, effectiveDate: String, promulgationDate: String, rawLines: [String]? = nil) {
+        self.rawLines = rawLines
         self.key = key
         self.lawName = lawName
         self.text = text
@@ -135,7 +141,7 @@ public enum ClauseExtractor {
             let cut = lines.firstIndex { $0.hasPrefix("③") } ?? lines.count
             return LawClause(key: key, lawName: act.name, text: lines[..<cut].joined(separator: "\n"),
                              effectiveDate: art.effectiveDate.isEmpty ? act.effectiveDate : art.effectiveDate,
-                             promulgationDate: act.promulgationDate)
+                             promulgationDate: act.promulgationDate, rawLines: Array(lines[..<cut]))
 
         case .decreeExitRequired, .decreeDefinitions:
             guard let decree = laws[LawCatalog.decreeID], let annex = decree.annex(1, branch: 2) else {
@@ -143,13 +149,17 @@ public enum ClauseExtractor {
             }
             let body = LawText.joinWrapped(annex.lines)
             let text: String?
+            let raw: [String]?
             if key == .decreeExitRequired {
                 text = LawText.slice(body, from: "2. 비상구", to: "3. 영업장 내부 피난통로")
+                raw = LawText.sliceLines(annex.lines, from: "2. 비상구", to: "3. 영업장 내부 피난통로")
             } else {
                 text = LawText.slice(body, from: "비고", to: nil).flatMap { LawText.slice($0, from: "2.", to: "4.") }
+                raw = LawText.sliceLines(annex.lines, from: "비고", to: nil).flatMap { LawText.sliceLines($0, from: "2.", to: "4.") }
             }
             guard let text else { throw ExtractError(reason: "\(key.citation) 경계 문구를 찾지 못함") }
-            return LawClause(key: key, lawName: decree.name, text: text, effectiveDate: decree.effectiveDate, promulgationDate: decree.promulgationDate)
+            return LawClause(key: key, lawName: decree.name, text: text, effectiveDate: decree.effectiveDate,
+                             promulgationDate: decree.promulgationDate, rawLines: raw)
 
         case .ruleExitLocation, .ruleExitSize:
             guard let rule = laws[LawCatalog.ruleID], let annex = rule.annex(2) else { throw ExtractError(reason: "시행규칙 별표 2를 찾지 못함") }
@@ -157,11 +167,10 @@ public enum ClauseExtractor {
             guard let row = rows.first(where: { LawText.compact($0.left).hasPrefix("2.주된출입구") }) else {
                 throw ExtractError(reason: "별표 2 「주된 출입구 및 비상구」 행을 찾지 못함")
             }
-            let text = key == .ruleExitLocation
-                ? LawText.slice(row.right, from: "1) 설치 위치", to: "2) 비상구등 규격")
-                : LawText.slice(row.right, from: "2) 비상구등 규격", to: "3) 구조")
-            guard let text else { throw ExtractError(reason: "\(key.citation) 경계 문구를 찾지 못함") }
-            return LawClause(key: key, lawName: rule.name, text: text, effectiveDate: rule.effectiveDate, promulgationDate: rule.promulgationDate)
+            let (from, to) = key == .ruleExitLocation ? ("1) 설치 위치", "2) 비상구등 규격") : ("2) 비상구등 규격", "3) 구조")
+            guard let text = LawText.slice(row.right, from: from, to: to) else { throw ExtractError(reason: "\(key.citation) 경계 문구를 찾지 못함") }
+            return LawClause(key: key, lawName: rule.name, text: text, effectiveDate: rule.effectiveDate,
+                             promulgationDate: rule.promulgationDate, rawLines: LawText.sliceLines(row.rightLines, from: from, to: to))
 
         case .noticeExistingGeneral, .noticeExistingSpecial:
             let id = key == .noticeExistingGeneral ? "31132" : "2034123"
@@ -170,7 +179,8 @@ public enum ClauseExtractor {
             let articles = notice.lines.filter { $0.hasPrefix("제1조") || $0.hasPrefix("제2조") }
             guard !articles.isEmpty else { throw ExtractError(reason: "고시(\(id)) 제1조·제2조를 찾지 못함") }
             let text = articles.joined(separator: "\n")
-            return LawClause(key: key, lawName: notice.name, text: text, effectiveDate: notice.effectiveDate, promulgationDate: notice.issuedDate)
+            return LawClause(key: key, lawName: notice.name, text: text, effectiveDate: notice.effectiveDate,
+                             promulgationDate: notice.issuedDate, rawLines: articles)
         }
     }
 }
@@ -221,12 +231,12 @@ public enum LawText {
     }
 
     /// 상자 표(│ 구분)를 행 묶음(├ 구분선 사이)별 왼쪽·오른쪽 칸 원문으로.
-    public static func boxTableRows(_ lines: [String]) -> [(left: String, right: String)] {
-        var rows: [(String, String)] = []
+    public static func boxTableRows(_ lines: [String]) -> [(left: String, right: String, rightLines: [String])] {
+        var rows: [(String, String, [String])] = []
         var left: [String] = []
         var right: [String] = []
         func flush() {
-            if !left.isEmpty || !right.isEmpty { rows.append((joinWrapped(left), joinWrapped(right))) }
+            if !left.isEmpty || !right.isEmpty { rows.append((joinWrapped(left), joinWrapped(right), right)) }
             left = []
             right = []
         }
@@ -242,6 +252,60 @@ public enum LawText {
         }
         flush()
         return rows
+    }
+
+    /// 원문 줄을 그대로 둔 채 경계 문구로 잘라낸다(공백 무시 대조). 첫 줄·끝 줄은 경계 문구 위치에서 자른다.
+    public static func sliceLines(_ lines: [String], from: String, to: String?) -> [String]? {
+        let compacts = lines.map { String($0.filter { !$0.isWhitespace }) }
+        var starts: [Int] = []
+        var acc = 0
+        for c in compacts {
+            starts.append(acc)
+            acc += c.count
+        }
+        let joined = compacts.joined()
+        let fromKey = String(from.filter { !$0.isWhitespace })
+        guard let fr = joined.range(of: fromKey) else { return nil }
+        let s = joined.distance(from: joined.startIndex, to: fr.lowerBound)
+        var e = joined.count
+        if let to {
+            let toKey = String(to.filter { !$0.isWhitespace })
+            guard let tr = joined.range(of: toKey, range: fr.upperBound..<joined.endIndex) else { return nil }
+            e = joined.distance(from: joined.startIndex, to: tr.lowerBound)
+        }
+        // 압축 위치 → (줄, 줄 안의 비공백 글자 순번)
+        func locate(_ off: Int, end: Bool) -> (Int, Int) {
+            var line = 0
+            for i in compacts.indices where compacts[i].count > 0 {
+                if end ? starts[i] < off : starts[i] <= off { line = i }
+            }
+            return (line, off - starts[line])
+        }
+        func rawIndex(_ raw: String, nonSpace n: Int) -> String.Index {
+            var count = 0
+            var idx = raw.startIndex
+            while idx < raw.endIndex {
+                if !raw[idx].isWhitespace {
+                    if count == n { return idx }
+                    count += 1
+                }
+                idx = raw.index(after: idx)
+            }
+            return raw.endIndex
+        }
+        let (l0, o0) = locate(s, end: false)
+        let (l1, o1) = locate(e, end: true)
+        guard l0 <= l1 else { return nil }
+        var out: [String] = []
+        for i in l0...l1 {
+            let raw = lines[i]
+            let lo = i == l0 ? rawIndex(raw, nonSpace: o0) : raw.startIndex
+            let hi = i == l1 ? rawIndex(raw, nonSpace: o1) : raw.endIndex
+            guard lo <= hi else { continue }
+            let piece = String(raw[lo..<hi]).replacingOccurrences(of: #"\s+$"#, with: "", options: .regularExpression)
+            if !piece.trimmingCharacters(in: .whitespaces).isEmpty { out.append(piece) }
+        }
+        return out.isEmpty ? nil : out
     }
 
     /// 공백을 무시하고 경계 문구로 잘라낸다. `to` 가 nil 이면 끝까지.

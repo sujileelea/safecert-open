@@ -60,4 +60,17 @@ struct LawSourceTests {
         #expect(url.contains("target=admrul"))
         #expect(url.contains("LID=31132"))
     }
+
+    @Test func rawLinesKeepOriginalWrappingAndMatchParsedText() async throws {
+        let s = try await seedSources()
+        let (clauses, _) = ClauseExtractor.extract(laws: s.laws, notices: s.notices)
+        for c in clauses {
+            let raw = try #require(c.rawLines, "\(c.key) 원문 줄 없음")
+            // 공백을 빼면 표시 원문과 해석용 글이 같다(같은 범위를 잘랐다).
+            #expect(LawText.compact(raw.joined()) == LawText.compact(c.text), "\(c.key)")
+        }
+        let size = try #require(clauses.first { $0.key == .ruleExitSize }?.rawLines)
+        #expect(size.first?.hasPrefix("2) 비상구등 규격") == true)
+        #expect(!size.joined().contains("│"))
+    }
 }

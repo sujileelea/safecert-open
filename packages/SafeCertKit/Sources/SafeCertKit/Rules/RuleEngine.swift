@@ -382,7 +382,13 @@ public enum RuleEngine {
         }
         // 공포 후 미시행 개정(같은 법령 계열)
         for p in snap.pendingAmendments { v.lawFlags.append(.pendingAmendment(lawName: p.lawName, effectiveDate: p.effectiveDate)) }
-        if snap.isStale { v.lawFlags.append(.staleSnapshot(baseDate: snap.baseDate)) }
+        if snap.isStale {
+            v.lawFlags.append(.staleSnapshot(baseDate: snap.baseDate))
+        } else {
+            for c in snap.carriedClauses where v.rule.clauses.contains(c.key) {
+                v.lawFlags.append(.clauseCarried(citation: c.citation, collectedOn: c.collectedOn ?? "-"))
+            }
+        }
         for e in snap.events where e.kind == .noticeListChanged && e.subject.contains("비상구") {
             v.lawFlags.append(.relatedNoticeChanged(e.subject))
         }

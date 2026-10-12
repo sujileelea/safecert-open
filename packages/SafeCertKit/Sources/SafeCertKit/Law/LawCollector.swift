@@ -10,6 +10,8 @@ public struct LawSources: Sendable {
     public var effectiveSearch: [LawSearchEntry]
     /// 요청별 실패 사유.
     public var errors: [String]
+    /// 녹화된 응답의 수집일(번들 초기값).
+    public var recordedOn: String? = nil
 
     public var isComplete: Bool { errors.isEmpty }
 }
@@ -19,7 +21,8 @@ public enum LawCollector {
         var sources = LawSources(
             fetchedAt: now,
             sourceDescription: fetcher.sourceDescription,
-            laws: [:], notices: [:], noticeSearch: [], effectiveSearch: [], errors: []
+            laws: [:], notices: [:], noticeSearch: [], effectiveSearch: [], errors: [],
+            recordedOn: fetcher.recordedOn
         )
         for request in LawCatalog.requests {
             do {

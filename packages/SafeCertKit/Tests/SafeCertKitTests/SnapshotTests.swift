@@ -115,4 +115,57 @@ struct SnapshotTests {
         let next = LawDate.nextDailyRun(after: day1.addingTimeInterval(3600 * 3))
         #expect(LawDate.stamp(next).hasSuffix("-0500"))
     }
+
+    // MARK: 독립 검토(2026-10-12) 반영 시험
+
+    @Test func seedBaseDateIsRecordingDateNotInstallDate() async throws {
+        let later = day1.addingTimeInterval(86_400 * 140)
+        let s = await LawSync.run(fetcher: try #require(BundledLawFetcher.bundled), previous: nil, isSeed: true, now: later)
+        #expect(s.baseDate == "2026-10-12")
+        #expect(s.id == "seed-20261012")
+        #expect(s.carriedClauses.isEmpty)
+    }
+
+    @Test func partialFailureFlagsCarriedClausesAndRetries() async throws {
+        let s1 = try await seed()
+        let base = try #require(BundledLawFetcher.bundled)
+        let f = PatchedFetcher(base: base) { r, d in
+            if r == .law(id: LawCatalog.decreeID) { throw LawFetchError.http(503) }
+            return d
+        }
+        let s2 = await LawSync.run(fetcher: f, previous: s1, now: day2)
+        #expect(!s2.isStale)
+        #expect(Set(s2.carriedClauses.map(\.key)) == [.decreeExitRequired, .decreeDefinitions])
+        #expect(s2.needsRetry)
+
+        let page = try VectorPDF.read(SamplePlanRenderer.pdf(for: .compliant))
+        var scale = ScaleEstimator.estimate(page)
+        scale?.confirmed = true
+        let r = RuleEngine.evaluate(.init(plan: PlanInterpreter.interpret(page), scale: scale, conditions: Conditions(), snapshot: s2))
+        let req = try #require(r.verdicts.first { $0.rule == .exitRequired })
+        #expect(req.lawFlags.contains { if case .clauseCarried = $0 { true } else { false } })
+        let loc = try #require(r.verdicts.first { $0.rule == .exitLocation })
+        #expect(!loc.lawFlags.contains { if case .clauseCarried = $0 { true } else { false } })
+    }
+
+    @Test func firstRunTotalFailureIsStaleSoItRetries() async {
+        let s = await LawSync.run(fetcher: FailingFetcher(), previous: nil, now: day1)
+        #expect(s.isStale)
+        #expect(s.needsRetry)
+        #expect(s.criteria.allSatisfy { $0.criterion == nil })
+    }
+
+    @Test func wordingChangeThenRevertRecovers() async throws {
+        let s1 = try await seed()
+        let base = try #require(BundledLawFetcher.bundled)
+        let changed = PatchedFetcher(base: base) { r, d in replacing(r, target: .law(id: LawCatalog.ruleID), "주된 출입구의 반대방향에 설치", "주된 출입구의 측면방향에 설치", in: d) }
+        let s2 = await LawSync.run(fetcher: changed, previous: s1, now: day2)
+        #expect(s2.state(.exitLocation)?.status == .interpretationChanged)
+        // 다음 날 원래 문구로 돌아오면 정상 경로로 복귀
+        let s3 = await LawSync.run(fetcher: base, previous: s2, now: day2.addingTimeInterval(86_400))
+        #expect(s3.state(.exitLocation)?.status == .verified)
+        // 문구가 바뀐 채로 하루 더 지나도 해석 변경 상태 유지
+        let s3b = await LawSync.run(fetcher: changed, previous: s2, now: day2.addingTimeInterval(86_400))
+        #expect(s3b.state(.exitLocation)?.status == .interpretationChanged)
+    }
 }

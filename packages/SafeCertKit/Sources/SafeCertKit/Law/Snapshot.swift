@@ -50,6 +50,8 @@ public struct CriterionState: Hashable, Codable, Sendable {
     /// 반영되지 않은 후보 값(실패·해석 변경 시 표시용).
     public var rejectedCandidate: Criterion?
     public var note: String?
+    /// 지금 값을 뽑은 조문의 문구 지문 — 문구가 바뀌었다가 되돌아오면 정상 경로로 복귀하는 기준.
+    public var acceptedWordingFingerprint: String? = nil
 }
 
 public struct PendingAmendment: Hashable, Codable, Sendable {
@@ -87,6 +89,12 @@ public struct LawSnapshot: Identifiable, Hashable, Codable, Sendable {
     public var collectionErrors: [String]
 
     public func clause(_ key: ClauseKey) -> LawClause? { clauses.first { $0.key == key } }
+
+    /// 수집 실패로 이전 수집본을 이어 쓴 조문.
+    public var carriedClauses: [LawClause] { clauses.filter { $0.collectedOn != nil && $0.collectedOn != baseDate } }
+
+    /// 다시 수집해야 하는가(전면 실패 또는 일부 조문 이어쓰기).
+    public var needsRetry: Bool { isStale || !carriedClauses.isEmpty }
     public func state(_ key: CriterionKey) -> CriterionState? { criteria.first { $0.key == key } }
 
     /// 최근 개정(30일) 여부.
@@ -144,7 +152,8 @@ public enum LawSnapshotBuilder {
         regression: RegressionCheck? = nil
     ) -> LawSnapshot {
         let now = sources.fetchedAt
-        let today = LawDate.day(now)
+        // 번들 초기값의 기준일은 설치일이 아니라 녹화일이다.
+        let today = isSeed ? (sources.recordedOn ?? LawDate.day(now)) : LawDate.day(now)
         var events: [LawChangeEvent] = []
 
         // 핵심 법령을 하나도 못 받으면 전날 스냅샷을 이어 쓴다.
@@ -160,7 +169,11 @@ public enum LawSnapshotBuilder {
 
         // 조문 추출(실패한 조문은 전날 것을 이어 쓴다)
         let (extracted, failures) = ClauseExtractor.extract(laws: sources.laws, notices: sources.notices)
-        var clauses = Dictionary(uniqueKeysWithValues: extracted.map { ($0.key, $0) })
+        var clauses = Dictionary(uniqueKeysWithValues: extracted.map { c -> (ClauseKey, LawClause) in
+            var c = c
+            c.collectedOn = today
+            return (c.key, c)
+        })
         for f in failures {
             events.append(LawChangeEvent(kind: .extractionFailed, subject: f.key.citation, detail: f.reason))
             if let old = previous?.clause(f.key) { clauses[f.key] = old }
@@ -168,8 +181,8 @@ public enum LawSnapshotBuilder {
         if previous == nil {
             events.append(LawChangeEvent(kind: .firstCollection, subject: "법령 기준", detail: "첫 수집 — 조문 \(clauses.count)개"))
         }
-        for (key, c) in clauses {
-            guard let old = previous?.clause(key) else { continue }
+        for key in ClauseKey.allCases {
+            guard let c = clauses[key], let old = previous?.clause(key) else { continue }
             if old.fingerprint != c.fingerprint {
                 let kind: LawChangeEvent.Kind = old.wordingFingerprint != c.wordingFingerprint ? .wordingChanged : .clauseChanged
                 events.append(LawChangeEvent(kind: kind, subject: key.citation,
@@ -220,12 +233,13 @@ public enum LawSnapshotBuilder {
         }
 
         return LawSnapshot(
-            id: isSeed ? "seed-\(LawDate.compact(now))" : LawDate.stamp(now),
+            id: isSeed ? "seed-\(today.replacingOccurrences(of: "-", with: ""))" : LawDate.stamp(now),
             baseDate: today,
             checkedAt: now,
             source: sources.sourceDescription,
             isSeed: isSeed,
-            isStale: false,
+            // 이전 스냅샷도 없이 핵심 법령을 하나도 못 받으면(첫 실행 장애) 실패 상태로 두어 다시 시도하게 한다.
+            isStale: coreMissing,
             clauses: ClauseKey.allCases.compactMap { clauses[$0] },
             criteria: states,
             pendingAmendments: pending,
@@ -258,7 +272,7 @@ public enum LawSnapshotBuilder {
 
         // ② 원문 근거
         let compactText = LawText.compact(clause.text)
-        let ungrounded = candidate?.values.values.filter { !compactText.contains($0.literal) }.map(\.literal) ?? ["값 없음"]
+        let ungrounded = candidate?.values.sorted { $0.key < $1.key }.map(\.value).filter { !compactText.contains($0.literal) }.map(\.literal) ?? ["값 없음"]
         checks.append(VerificationCheck(kind: .grounding, passed: ungrounded.isEmpty,
                                         detail: ungrounded.isEmpty ? "모든 값이 원문에 그대로 있음" : "원문에 없는 값: \(ungrounded.joined(separator: ", "))"))
 
@@ -272,7 +286,7 @@ public enum LawSnapshotBuilder {
         // ④ 변화 폭
         var magnitudeIssues: [String] = []
         if let c = candidate, let prev {
-            for (name, v) in c.values {
+            for (name, v) in c.values.sorted(by: { $0.key < $1.key }) {
                 guard let old = prev[name] else { continue }
                 if old.unit != v.unit { magnitudeIssues.append("\(name) 단위 변경") }
                 if v.unit != .date, old.number > 0 {
@@ -292,25 +306,30 @@ public enum LawSnapshotBuilder {
             checks.append(VerificationCheck(kind: .regression, passed: candidate != nil, detail: candidate == nil ? "값 없음" : "회귀 세트 미구성"))
         }
 
-        let wordingChanged = prevClause.map { $0.wordingFingerprint != clause.wordingFingerprint } ?? false
+        // 문구 비교 기준 = 지금 값을 뽑은 조문의 문구(없으면 전날 조문). 바뀌었다가 되돌아오면 정상 경로로 복귀한다.
+        let acceptedWording = prevState?.acceptedWordingFingerprint ?? prevClause?.wordingFingerprint
+        let wordingChanged = acceptedWording.map { $0 != clause.wordingFingerprint } ?? false
         let allPassed = checks.allSatisfy(\.passed)
 
         if wordingChanged {
             return CriterionState(key: key, criterion: prev, status: prev == nil ? .unavailable : .interpretationChanged, checks: checks,
                                   acceptedOn: prevState?.acceptedOn, revisedOn: prevState?.revisedOn, rejectedCandidate: candidate,
-                                  note: "조문 문구가 바뀌어 해석이 달라졌을 수 있다 — 자동 반영하지 않음")
+                                  note: "조문 문구가 바뀌어 해석이 달라졌을 수 있다 — 자동 반영하지 않음. 파서·규칙 갱신(앱 업데이트) 전까지 이전 값 유지",
+                                  acceptedWordingFingerprint: acceptedWording)
         }
         if allPassed, let c = candidate {
             let changed = prev != nil && prev != c
             return CriterionState(key: key, criterion: c, status: .verified, checks: checks,
                                   acceptedOn: changed || prev == nil ? today : prevState?.acceptedOn,
                                   revisedOn: changed ? today : prevState?.revisedOn,
-                                  rejectedCandidate: nil, note: changed ? "개정 값 자동 검증 반영" : nil)
+                                  rejectedCandidate: nil, note: changed ? "개정 값 자동 검증 반영" : nil,
+                                  acceptedWordingFingerprint: clause.wordingFingerprint)
         }
         let failed = checks.filter { !$0.passed }.map(\.kind.displayName).joined(separator: ", ")
         return CriterionState(key: key, criterion: prev, status: prev == nil ? .unavailable : .rejected, checks: checks,
                               acceptedOn: prevState?.acceptedOn, revisedOn: prevState?.revisedOn, rejectedCandidate: candidate,
-                              note: "자동 검증 실패(\(failed)) — 이전 값 유지")
+                              note: "자동 검증 실패(\(failed)) — 이전 값 유지",
+                              acceptedWordingFingerprint: acceptedWording)
     }
 
     static func saneRange(_ v: CriterionValue) -> Bool {

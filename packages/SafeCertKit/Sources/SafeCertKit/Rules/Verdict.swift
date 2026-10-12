@@ -85,6 +85,7 @@ public enum LawFlag: Hashable, Codable, Sendable {
     case recentlyRevised(String)
     case pendingAmendment(lawName: String, effectiveDate: String)
     case staleSnapshot(baseDate: String)
+    case clauseCarried(citation: String, collectedOn: String)
     case relatedNoticeChanged(String)
 
     public var text: String {
@@ -95,6 +96,7 @@ public enum LawFlag: Hashable, Codable, Sendable {
         case .recentlyRevised(let d): "최근 개정 · 자동 검증(\(d) 반영)"
         case .pendingAmendment(let name, let date): "개정 예정 — \(name) \(LawDate.pretty(date)) 시행"
         case .staleSnapshot(let d): "법령 수집 실패 — 기준일 \(d) 의 법령으로 판정"
+        case .clauseCarried(let c, let d): "일부 수집 실패 — \(c) 는 \(d) 수집본으로 판정"
         case .relatedNoticeChanged(let n): "관련 고시 변동 — \(n)"
         }
     }

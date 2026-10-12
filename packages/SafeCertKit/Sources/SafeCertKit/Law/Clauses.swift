@@ -63,6 +63,8 @@ public struct LawClause: Identifiable, Hashable, Codable, Sendable {
     public var fingerprint: String
     /// 숫자를 가린 원문 지문 — 숫자만 바뀌었는지, 문구가 바뀌었는지 가른다.
     public var wordingFingerprint: String
+    /// 이 조문을 실제로 받아온 법령 기준일. 수집 실패로 이어 쓴 조문은 이전 날짜가 남는다.
+    public var collectedOn: String?
 
     public var id: String { key.rawValue }
     public var citation: String { key.citation }

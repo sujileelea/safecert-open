@@ -66,6 +66,12 @@ public protocol LawFetching: Sendable {
     func fetch(_ request: LawRequest) async throws -> Data
     /// 출처 표기(실호출 / 번들 초기값).
     var sourceDescription: String { get }
+    /// 녹화된 응답이면 그 수집일(yyyy-MM-dd). 실호출은 nil.
+    var recordedOn: String? { get }
+}
+
+public extension LawFetching {
+    var recordedOn: String? { nil }
 }
 
 /// 실호출. 인증값(OC)은 신청한 API 인증값. HTTPS + Referer 헤더(헤더 없는 요청은 거부된다는 커뮤니티 보고가 있다).
@@ -102,18 +108,19 @@ public struct LawAPIClient: LawFetching {
 /// 번들 초기값(녹화된 응답)에서 읽는다. 첫 실행·오프라인·시험용.
 public struct BundledLawFetcher: LawFetching {
     public let directory: URL
-    public let recordedOn: String
+    public let recordedDate: String
+    public var recordedOn: String? { recordedDate }
 
     public init(directory: URL, recordedOn: String = "2026-10-12") {
         self.directory = directory
-        self.recordedOn = recordedOn
+        recordedDate = recordedOn
     }
 
     public static var bundled: BundledLawFetcher? {
         SafeCertKit.lawSeedDirectory.map { BundledLawFetcher(directory: $0) }
     }
 
-    public var sourceDescription: String { "번들 초기값(\(recordedOn) 수집)" }
+    public var sourceDescription: String { "번들 초기값(\(recordedDate) 수집)" }
 
     public func fetch(_ request: LawRequest) async throws -> Data {
         let url = directory.appendingPathComponent(request.seedFileName)

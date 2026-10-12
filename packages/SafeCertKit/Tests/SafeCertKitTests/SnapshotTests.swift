@@ -168,4 +168,24 @@ struct SnapshotTests {
         let s3b = await LawSync.run(fetcher: changed, previous: s2, now: day2.addingTimeInterval(86_400))
         #expect(s3b.state(.exitLocation)?.status == .interpretationChanged)
     }
+
+    @Test func groundingRequiresDigitBoundaryAndConsistentValue() {
+        #expect(!Grounding.occurs("10미터", in: "수평거리가100미터이하"))
+        #expect(Grounding.occurs("10미터", in: "수평거리가10미터이하"))
+        #expect(Grounding.value(of: "2분의1", unit: .ratio) == 0.5)
+        #expect(Grounding.value(of: "2010년11월11일", unit: .date) == 20101111)
+        #expect(Grounding.value(of: "75센티미터", unit: .centimeter) == 75)
+    }
+
+    @Test func regressionReportsDirection() async throws {
+        let s1 = try await seed()
+        let check = RegressionSuite.check(cases: RegressionSuite.sampleCases(), base: s1)
+        let old = try #require(s1.state(.exitLocation)?.criterion)
+        var stricter = old
+        stricter.values["ratio"] = CriterionValue(0.9, .ratio, literal: "10분의9")
+        let r = check(.exitLocation, old, stricter)
+        #expect(r.passed, "\(r.detail)")
+        #expect(r.detail.contains("엄격화"))
+        #expect(RegressionSuite.strictness(.exitRequired, s1.state(.exitRequired)!.criterion!, s1.state(.exitRequired)!.criterion!) == 0)
+    }
 }

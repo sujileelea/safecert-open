@@ -270,11 +270,23 @@ public enum LawSnapshotBuilder {
         }
         checks.append(VerificationCheck(kind: .schema, passed: schemaIssues.isEmpty, detail: schemaIssues.isEmpty ? "필수 값·단위·범위 정상" : schemaIssues.joined(separator: ", ")))
 
-        // ② 원문 근거
+        // ② 원문 근거: 원문 글자가 숫자 경계에서 그대로 있고, 그 글자로 다시 계산한 값이 정규화 값과 같은가
         let compactText = LawText.compact(clause.text)
-        let ungrounded = candidate?.values.sorted { $0.key < $1.key }.map(\.value).filter { !compactText.contains($0.literal) }.map(\.literal) ?? ["값 없음"]
-        checks.append(VerificationCheck(kind: .grounding, passed: ungrounded.isEmpty,
-                                        detail: ungrounded.isEmpty ? "모든 값이 원문에 그대로 있음" : "원문에 없는 값: \(ungrounded.joined(separator: ", "))"))
+        var groundingIssues: [String] = []
+        if let c = candidate {
+            for (name, v) in c.values.sorted(by: { $0.key < $1.key }) {
+                if !Grounding.occurs(v.literal, in: compactText) { groundingIssues.append("\(name): 원문에 「\(v.literal)」 없음") }
+                if let n = Grounding.value(of: v.literal, unit: v.unit), abs(n - v.number) > 1e-9 {
+                    groundingIssues.append("\(name): 원문 \(v.literal) ≠ 값 \(v.number)")
+                } else if Grounding.value(of: v.literal, unit: v.unit) == nil {
+                    groundingIssues.append("\(name): 원문 글자 해석 불가")
+                }
+            }
+        } else {
+            groundingIssues.append("값 없음")
+        }
+        checks.append(VerificationCheck(kind: .grounding, passed: groundingIssues.isEmpty,
+                                        detail: groundingIssues.isEmpty ? "모든 값이 원문에 숫자 경계째 있고 원문으로 다시 계산한 값과 같음" : groundingIssues.joined(separator: ", ")))
 
         // ③ 이중 정규화
         let second = try? secondary.get()
@@ -349,5 +361,35 @@ public enum LawSync {
                            now: Date = Date(), regression: RegressionCheck? = nil) async -> LawSnapshot {
         let sources = await LawCollector.collect(using: fetcher, now: now)
         return LawSnapshotBuilder.build(sources: sources, previous: previous, isSeed: isSeed, regression: regression)
+    }
+}
+
+/// 검증 ② 보조: 원문 글자 위치·재계산.
+enum Grounding {
+    /// 앞이 숫자·소수점이 아닌 자리에서 literal 이 나타나는가("100미터" 안의 "10미터"는 불인정).
+    static func occurs(_ literal: String, in text: String) -> Bool {
+        var search = text.startIndex..<text.endIndex
+        while let r = text.range(of: literal, range: search) {
+            if r.lowerBound == text.startIndex { return true }
+            let prev = text[text.index(before: r.lowerBound)]
+            if !(prev.isNumber || prev == ".") { return true }
+            search = r.upperBound..<text.endIndex
+        }
+        return false
+    }
+
+    /// 원문 글자 → 값. 분수 「N분의M」 = M/N, 날짜 「Y년M월D일」 = YYYYMMDD, 그 외 = 앞 숫자.
+    static func value(of literal: String, unit: CriterionUnit) -> Double? {
+        let nums = literal.matches(of: /\d+(?:\.\d+)?/).compactMap { Double($0.output) }
+        switch unit {
+        case .ratio:
+            guard nums.count == 2, literal.contains("분의"), nums[0] > 0 else { return nil }
+            return nums[1] / nums[0]
+        case .date:
+            guard nums.count == 3 else { return nil }
+            return nums[0] * 10000 + nums[1] * 100 + nums[2]
+        default:
+            return nums.first
+        }
     }
 }

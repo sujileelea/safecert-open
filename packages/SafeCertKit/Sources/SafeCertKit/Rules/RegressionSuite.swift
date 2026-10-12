@@ -31,6 +31,8 @@ public enum RegressionSuite {
             let after = replacing(base, key, new)
             var affected = 0
             var leaks: [String] = []
+            var directionIssues: [String] = []
+            let direction = strictness(key, old, new)
             for c in cases {
                 let r0 = RuleEngine.evaluate(.init(plan: c.plan, scale: c.scale, conditions: c.conditions, snapshot: before))
                 let r1 = RuleEngine.evaluate(.init(plan: c.plan, scale: c.scale, conditions: c.conditions, snapshot: after))
@@ -39,15 +41,55 @@ public enum RegressionSuite {
                     guard let prior = v0[v.id] else { leaks.append("\(c.name): 새 판정 \(v.id)"); continue }
                     let changed = prior.color != v.color || prior.summary != v.summary
                     if !changed { continue }
-                    if v.rule.criteria.contains(key) { affected += 1 } else { leaks.append("\(c.name): \(v.id)") }
+                    if v.rule.criteria.contains(key) {
+                        affected += 1
+                        // 방향 일관성: 기준이 엄격해졌는데 판정이 나아지거나, 완화됐는데 나빠지면 엔진 비교 방향 오류
+                        if let r0 = severity(prior.color), let r1 = severity(v.color), let direction {
+                            if direction > 0 && r1 < r0 { directionIssues.append("\(c.name): \(v.id) 엄격해졌는데 완화") }
+                            if direction < 0 && r1 > r0 { directionIssues.append("\(c.name): \(v.id) 완화됐는데 엄격") }
+                        }
+                    } else {
+                        leaks.append("\(c.name): \(v.id)")
+                    }
                 }
                 if r0.verdicts.count != r1.verdicts.count { leaks.append("\(c.name): 판정 수 변화") }
             }
-            if leaks.isEmpty {
-                return (true, "샘플 \(cases.count)건 재판정 — 영향 판정 \(affected)건, 무관 규칙 변화 없음")
-            }
-            return (false, "무관 규칙 변화: \(leaks.prefix(3).joined(separator: ", "))")
+            if !leaks.isEmpty { return (false, "무관 규칙 변화: \(leaks.prefix(3).joined(separator: ", "))") }
+            if !directionIssues.isEmpty { return (false, "방향 불일치: \(directionIssues.prefix(3).joined(separator: ", "))") }
+            let dirText = direction.map { $0 > 0 ? "엄격화" : $0 < 0 ? "완화" : "동일" } ?? "혼합"
+            return (true, "샘플 \(cases.count)건 재판정 — 영향 판정 \(affected)건(\(dirText) 방향 일관), 무관 규칙 변화 없음")
         }
+    }
+
+    /// 초록 0 < 주황 1 < 빨강 2. 회색·노랑은 비교하지 않는다.
+    static func severity(_ c: VerdictColor) -> Int? {
+        switch c {
+        case .green: 0
+        case .orange: 1
+        case .red: 2
+        case .gray, .yellow: nil
+        }
+    }
+
+    /// 값별 엄격 방향: +1 = 값이 클수록 엄격, -1 = 클수록 완화.
+    static let strictSign: [CriterionKey: [String: Double]] = [
+        .exitSize: ["minWidth": 1, "minHeight": 1],
+        .exitLocation: ["ratio": 1],
+        .exitRequired: ["exemptionA.ratio": 1, "exemptionB.maxArea": -1, "exemptionB.maxDistance": -1],
+        .existingExemption: ["maxArea": -1]
+    ]
+
+    /// 전체 변화 방향: +1 엄격화, -1 완화, 0 동일, nil 혼합·판단 불가.
+    static func strictness(_ key: CriterionKey, _ old: Criterion, _ new: Criterion) -> Int? {
+        guard let signs = strictSign[key] else { return nil }
+        var dir = 0
+        for (name, sign) in signs.sorted(by: { $0.key < $1.key }) {
+            guard let a = old[name]?.number, let b = new[name]?.number, a != b else { continue }
+            let d = (b > a ? 1 : -1) * Int(sign)
+            if dir == 0 { dir = d } else if dir != d { return nil }
+        }
+        for name in Set(old.values.keys).union(new.values.keys) where signs[name] == nil && old[name] != new[name] { return nil }
+        return dir
     }
 
     static func replacing(_ s: LawSnapshot, _ key: CriterionKey, _ c: Criterion) -> LawSnapshot {

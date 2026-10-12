@@ -173,8 +173,8 @@ public enum SamplePlanRenderer {
         }
 
         // 칸막이 실
-        ctx.setLineWidth(partitionWidth)
         for r in plan.rooms {
+            ctx.setLineWidth(partitionWidth)
             let doorStart = r.x + (r.width - r.doorWidth) / 2
             let doorEnd = doorStart + r.doorWidth
             let bottomY = r.y + r.height
@@ -192,6 +192,7 @@ public enum SamplePlanRenderer {
             lines.remove(at: doorEdgeIndex)
             lines.append((P(r.x, doorY), P(doorStart, doorY)))
             lines.append((P(doorEnd, doorY), P(r.x + r.width, doorY)))
+            ctx.setLineWidth(partitionWidth)
             for (a, b) in lines {
                 ctx.move(to: a)
                 ctx.addLine(to: b)

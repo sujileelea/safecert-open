@@ -54,7 +54,7 @@ public struct CriterionValue: Hashable, Codable, Sendable {
         switch unit {
         case .ratio: literal
         case .date: literal
-        default: "\(number.formatted(.number.precision(.fractionLength(0...2))))\(unit.rawValue)"
+        default: "\(number.formatted(.number.precision(.fractionLength(0...2)).locale(Locale(identifier: "ko_KR"))))\(unit.rawValue)"
         }
     }
 }

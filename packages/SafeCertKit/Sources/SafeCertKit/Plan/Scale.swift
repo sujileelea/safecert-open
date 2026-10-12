@@ -44,8 +44,8 @@ public struct ScaleEstimate: Hashable, Codable, Sendable {
     /// 치수 문자 2개 이상 일치, 어긋남 0.
     public var isCrossValidated: Bool { crossChecks >= 2 && conflicts == 0 }
 
-    /// 한 포인트 오차가 만드는 실제 길이 오차(m) — 판정 경계 허용 폭의 근거.
-    public var resolutionMeters: Double { metersPerPoint * 1.5 }
+    /// 판정 경계 허용 폭(m). 벡터 좌표는 정확하므로 CAD 작도 오차 수준(0.5pt)만 둔다.
+    public var resolutionMeters: Double { metersPerPoint * 0.5 }
 }
 
 public enum ScaleEstimator {

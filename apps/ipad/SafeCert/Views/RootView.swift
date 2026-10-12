@@ -107,9 +107,9 @@ struct LawRow: View {
             if law.isSyncing {
                 Text("실측 중…").font(.system(size: 11)).foregroundStyle(Theme.secondary)
             } else if let s = law.current {
-                Text("기준일 \(s.baseDate)\(s.isStale ? " · 수집 실패" : s.isSeed ? " · 초기값" : "")")
+                Text("기준일 \(s.baseDate)\(s.isStale ? " · 수집 실패" : !s.carriedClauses.isEmpty ? " · 일부 수집 실패" : s.isSeed ? " · 초기값" : "")")
                     .font(.system(size: 11))
-                    .foregroundStyle(s.isStale ? Theme.color(.orange) : Theme.secondary)
+                    .foregroundStyle(s.needsRetry ? Theme.color(.orange) : Theme.secondary)
             }
         }
     }

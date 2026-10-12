@@ -152,6 +152,7 @@ struct VerdictCard: View {
             if case .recentlyRevised = f { Chip(text: "최근 개정", tint: Theme.color(.yellow)) }
             if case .pendingAmendment = f { Chip(text: "개정 예정", tint: Theme.color(.yellow)) }
             if case .staleSnapshot = f { Chip(text: "법령 수집 실패", tint: Theme.color(.orange)) }
+            if case .clauseCarried = f { Chip(text: "일부 수집 실패", tint: Theme.color(.orange)) }
         }
     }
 

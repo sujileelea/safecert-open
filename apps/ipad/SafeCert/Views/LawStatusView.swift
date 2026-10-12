@@ -26,7 +26,7 @@ struct LawStatusView: View {
         .sheet(item: $openClause) { c in
             NavigationStack {
                 ScrollView {
-                    Text(c.text).font(Theme.bodyFont).textSelection(.enabled).padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(c.displayText).font(Theme.bodyFont).textSelection(.enabled).padding(20).frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .navigationTitle(c.citation)
                 .navigationBarTitleDisplayMode(.inline)
@@ -45,8 +45,8 @@ struct LawStatusView: View {
                     .fontWeight(.semibold)
             }
             HStack(spacing: 8) {
-                Chip(text: s.isStale ? "수집 실패 · 이전 기준 사용" : s.isSeed ? "번들 초기값" : "실측 정상",
-                     tint: s.isStale ? Theme.color(.orange) : s.isSeed ? Theme.secondary : Theme.color(.green))
+                Chip(text: s.isStale ? "수집 실패 · 이전 기준 사용" : !s.carriedClauses.isEmpty ? "일부 수집 실패 · 재시도 예정" : s.isSeed ? "번들 초기값" : "실측 정상",
+                     tint: s.isStale || !s.carriedClauses.isEmpty ? Theme.color(.orange) : s.isSeed ? Theme.secondary : Theme.color(.green))
                 Chip(text: "스냅샷 \(s.id)")
                 Chip(text: s.source)
             }
@@ -107,7 +107,7 @@ struct LawStatusView: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(c.citation).font(Theme.bodyFont).foregroundStyle(Theme.ink)
-                            Text("\(c.layer.rawValue) · 시행 \(LawDate.pretty(c.effectiveDate)) · 지문 \(c.fingerprint.prefix(10))")
+                            Text("\(c.layer.rawValue) · 시행 \(LawDate.pretty(c.effectiveDate)) · 수집 \(c.collectedOn ?? "-") · 지문 \(c.fingerprint.prefix(10))")
                                 .font(.system(size: 11)).foregroundStyle(Theme.secondary)
                         }
                         Spacer()

@@ -13,6 +13,8 @@ final class LawStore {
 
     private(set) var current: LawSnapshot?
     private(set) var isSyncing = false
+    /// 진행 중인 실측. 다른 호출자는 새로 시작하지 않고 이것을 기다린다.
+    private var syncTask: Task<Void, Never>?
     private(set) var lastAttempt: Date?
     private(set) var nextScheduled: Date?
 
@@ -37,21 +39,34 @@ final class LawStore {
         await ensureToday()
     }
 
-    /// 당일(KST) 실측 스냅샷이 없으면 동기화한다.
+    /// 당일(KST) 실측 스냅샷이 없으면 동기화한다. 진행 중인 실측이 있으면 끝날 때까지 기다린다.
     func ensureToday() async {
-        guard !isSyncing else { return }
+        if let syncTask {
+            await syncTask.value
+            return
+        }
         let today = LawDate.day(Date())
-        if let c = current, !c.isSeed, !c.isStale, c.baseDate == today {
+        if let c = current, !c.isSeed, !c.needsRetry, c.baseDate == today {
             schedule()
             return
         }
-        // 수집 실패 상태면 1시간에 한 번만 다시 시도
-        if let c = current, c.isStale, let last = lastAttempt, Date().timeIntervalSince(last) < 3600 { return }
+        // 수집 실패(전면·일부) 상태면 1시간에 한 번만 다시 시도
+        if let c = current, c.needsRetry, c.baseDate == today || c.isStale, let last = lastAttempt, Date().timeIntervalSince(last) < 3600 { return }
         await sync()
     }
 
     func sync() async {
-        guard !isSyncing else { return }
+        if let syncTask {
+            await syncTask.value
+            return
+        }
+        let task = Task { await performSync() }
+        syncTask = task
+        await task.value
+        syncTask = nil
+    }
+
+    private func performSync() async {
         isSyncing = true
         lastAttempt = Date()
         let oc = KeychainStore.lawOC ?? LawAPIClient.sampleOC

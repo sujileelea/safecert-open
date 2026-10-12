@@ -96,10 +96,13 @@ public enum ExplanationComposer {
         guard let b = plan.boundary?.bounds else { return "도면 위 표시 참조" }
         let pts = loc.markers.isEmpty ? (loc.area.map { [$0.centroid] } ?? []) : loc.markers
         guard !pts.isEmpty else { return "영업장 전체" }
-        return pts.map { p in
+        var names: [String] = []
+        for p in pts {
             let h = p.x < b.minX + b.width / 3 ? "왼쪽" : p.x > b.maxX - b.width / 3 ? "오른쪽" : "가운데"
             let vtc = p.y < b.minY + b.height / 3 ? "위" : p.y > b.maxY - b.height / 3 ? "아래" : "중간"
-            return "영업장 \(h) \(vtc)"
-        }.joined(separator: " → ")
+            let name = "영업장 \(h) \(vtc)"
+            if names.last != name { names.append(name) }
+        }
+        return names.joined(separator: " → ")
     }
 }

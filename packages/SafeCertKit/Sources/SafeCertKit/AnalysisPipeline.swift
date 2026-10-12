@@ -9,7 +9,7 @@ public struct PreparedDrawing: Sendable {
     public var scaleEstimate: ScaleEstimate?
 
     /// 벡터 도면인가(래스터 스캔본은 자동판정 보장 범위 밖).
-    public var isVector: Bool { page.segmentCount >= 20 }
+    public var isVector: Bool { page.segmentCount >= 4 }
 }
 
 /// 앱이 쓰는 진입점. 무거운 계산은 호출한 액터 밖에서 돈다.
@@ -17,7 +17,7 @@ public enum AnalysisPipeline {
     public static func prepare(pdf: Data, pageIndex: Int) async throws -> PreparedDrawing {
         let page = try VectorPDF.read(pdf, pageIndex: pageIndex)
         var plan = PlanInterpreter.interpret(page)
-        if page.segmentCount < 20 {
+        if page.segmentCount < 4 {
             plan.notes.append("벡터 선이 거의 없다(스캔 이미지로 보임). 파일럿은 CAD 에서 직접 출력한 벡터 PDF 만 자동 판정한다.")
         }
         return PreparedDrawing(

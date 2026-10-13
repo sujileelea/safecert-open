@@ -128,8 +128,16 @@ public extension SamplePlan {
 // MARK: - PDF 렌더링
 
 public enum SamplePlanRenderer {
+    /// 출력 방식.
+    public enum Style: Sendable {
+        /// 벽 = 굵은 선, 문 궤적 = 곡선, 글자 = 글자.
+        case standard
+        /// 실제 CAD 출력에 흔한 방식: 벽 = 칠한 도형(얇은 펜), 문 궤적 = 직선 조각, 글자 = 외곽선 도형.
+        case cadExport
+    }
+
     /// A3 가로 벡터 PDF 를 만든다.
-    public static func pdf(for plan: SamplePlan) -> Data {
+    public static func pdf(for plan: SamplePlan, style: Style = .standard) -> Data {
         let page = CGRect(x: 0, y: 0, width: 1190.55, height: 841.89)
         let data = NSMutableData()
         var box = page
@@ -139,13 +147,14 @@ public enum SamplePlanRenderer {
         // 좌상단 원점으로 뒤집는다.
         ctx.translateBy(x: 0, y: page.height)
         ctx.scaleBy(x: 1, y: -1)
-        draw(plan, in: ctx, page: page)
+        draw(plan, in: ctx, page: page, style: style)
         ctx.endPDFPage()
         ctx.closePDF()
         return data as Data
     }
 
-    static func draw(_ plan: SamplePlan, in ctx: CGContext, page: CGRect) {
+    static func draw(_ plan: SamplePlan, in ctx: CGContext, page: CGRect, style: Style = .standard) {
+        let cad = style == .cadExport
         let k = plan.pointsPerMeter
         let origin = CGPoint(x: 140, y: 150)
         func P(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: origin.x + x * k, y: origin.y + y * k) }
@@ -153,20 +162,40 @@ public enum SamplePlanRenderer {
         let wallWidth = 0.15 * k
         let partitionWidth = 0.1 * k
 
+        // 벽 한 토막: standard = 굵은 선, cadExport = 두께만큼의 칠한 사각형(펜 0.72).
+        func wall(_ a: CGPoint, _ b: CGPoint, thickness: CGFloat) {
+            if cad {
+                let dx = b.x - a.x, dy = b.y - a.y
+                let len = max(hypot(dx, dy), 0.001)
+                let nx = -dy / len * thickness / 2, ny = dx / len * thickness / 2
+                ctx.setLineWidth(0.72)
+                ctx.move(to: CGPoint(x: a.x + nx, y: a.y + ny))
+                ctx.addLine(to: CGPoint(x: b.x + nx, y: b.y + ny))
+                ctx.addLine(to: CGPoint(x: b.x - nx, y: b.y - ny))
+                ctx.addLine(to: CGPoint(x: a.x - nx, y: a.y - ny))
+                ctx.closePath()
+                ctx.fillPath()
+            } else {
+                ctx.setLineWidth(thickness)
+                ctx.move(to: a)
+                ctx.addLine(to: b)
+                ctx.strokePath()
+            }
+        }
+
         // 외벽: 문 개구부를 뺀 구간만 그린다.
         ctx.setStrokeColor(CGColor(gray: 0, alpha: 1))
+        ctx.setFillColor(CGColor(gray: 0, alpha: 1))
         ctx.setLineCap(.butt)
         ctx.setLineWidth(wallWidth)
-        for wall in [SamplePlan.Wall.top, .right, .bottom, .left] {
-            let len = (wall == .top || wall == .bottom) ? plan.width : plan.height
-            let openings = plan.doors.filter { $0.wall == wall }.map { ($0.offset, $0.offset + $0.width) }.sorted { $0.0 < $1.0 }
+        for side in [SamplePlan.Wall.top, .right, .bottom, .left] {
+            let len = (side == .top || side == .bottom) ? plan.width : plan.height
+            let openings = plan.doors.filter { $0.wall == side }.map { ($0.offset, $0.offset + $0.width) }.sorted { $0.0 < $1.0 }
             var cursor = 0.0
             for (s, e) in openings + [(len, len)] {
                 if s > cursor + 1e-6 {
-                    let (a, b) = wallPoints(wall, cursor, s, plan)
-                    ctx.move(to: P(a.x, a.y))
-                    ctx.addLine(to: P(b.x, b.y))
-                    ctx.strokePath()
+                    let (a, b) = wallPoints(side, cursor, s, plan)
+                    wall(P(a.x, a.y), P(b.x, b.y), thickness: wallWidth)
                 }
                 cursor = e
             }
@@ -192,17 +221,12 @@ public enum SamplePlanRenderer {
             lines.remove(at: doorEdgeIndex)
             lines.append((P(r.x, doorY), P(doorStart, doorY)))
             lines.append((P(doorEnd, doorY), P(r.x + r.width, doorY)))
-            ctx.setLineWidth(partitionWidth)
-            for (a, b) in lines {
-                ctx.move(to: a)
-                ctx.addLine(to: b)
-                ctx.strokePath()
-            }
+            for (a, b) in lines { wall(a, b, thickness: partitionWidth) }
             // 실 문: 실 안쪽으로 열림
             let hinge = P(doorStart, doorY)
             let dir: CGFloat = doorOnBottom ? -1 : 1
-            drawDoor(ctx, hinge: hinge, closedEnd: P(doorEnd, doorY), openEnd: CGPoint(x: hinge.x, y: hinge.y + dir * r.doorWidth * k))
-            text(ctx, r.label, at: P(r.x + r.width / 2, r.y + r.height / 2), size: 11)
+            drawDoor(ctx, hinge: hinge, closedEnd: P(doorEnd, doorY), openEnd: CGPoint(x: hinge.x, y: hinge.y + dir * r.doorWidth * k), polyline: cad)
+            text(ctx, r.label, at: P(r.x + r.width / 2, r.y + r.height / 2), size: 11, outlined: cad)
         }
 
         // 영업장 출입문
@@ -213,41 +237,41 @@ public enum SamplePlanRenderer {
             let outward = outwardNormal(d.wall)
             let sign: CGFloat = d.swingsOut ? 1 : -1
             let open = CGPoint(x: hinge.x + outward.x * sign * d.width * k, y: hinge.y + outward.y * sign * d.width * k)
-            drawDoor(ctx, hinge: hinge, closedEnd: closed, openEnd: open)
+            drawDoor(ctx, hinge: hinge, closedEnd: closed, openEnd: open, polyline: cad)
             let mid = CGPoint(x: (hinge.x + closed.x) / 2, y: (hinge.y + closed.y) / 2)
             let labelOffset: CGFloat = 1.9 * k
             let labelAt = CGPoint(x: mid.x + outward.x * labelOffset, y: mid.y + outward.y * labelOffset)
-            if let label = d.label { text(ctx, label, at: labelAt, size: 11) }
+            if let label = d.label { text(ctx, label, at: labelAt, size: 11, outlined: cad) }
             if let tag = d.tag {
-                text(ctx, tag, at: CGPoint(x: labelAt.x, y: labelAt.y + 14), size: 8)
+                text(ctx, tag, at: CGPoint(x: labelAt.x, y: labelAt.y + 14), size: 8, outlined: cad)
             }
         }
 
         // 홀 이름
-        text(ctx, plan.hallLabel, at: P(plan.width * 0.35, plan.height * 0.6), size: 13)
+        text(ctx, plan.hallLabel, at: P(plan.width * 0.35, plan.height * 0.6), size: 13, outlined: cad)
 
         // 치수선(가로·세로) + 치수 문자(mm)
-        ctx.setLineWidth(0.4)
+        ctx.setLineWidth(cad ? 0.12 : 0.4)
         let dimY = -2.6
         ctx.move(to: P(0, dimY)); ctx.addLine(to: P(plan.width, dimY)); ctx.strokePath()
         for x in [0, plan.width] {
             ctx.move(to: P(x, dimY - 0.25)); ctx.addLine(to: P(x, dimY + 0.25)); ctx.strokePath()
         }
-        text(ctx, String(Int((plan.width * 1000).rounded())), at: P(plan.width / 2, dimY - 0.45), size: 9)
+        text(ctx, String(Int((plan.width * 1000).rounded())), at: P(plan.width / 2, dimY - 0.45), size: 9, outlined: cad)
         let dimX = -3.2
         ctx.move(to: P(dimX, 0)); ctx.addLine(to: P(dimX, plan.height)); ctx.strokePath()
         for y in [0, plan.height] {
             ctx.move(to: P(dimX - 0.25, y)); ctx.addLine(to: P(dimX + 0.25, y)); ctx.strokePath()
         }
-        text(ctx, String(Int((plan.height * 1000).rounded())), at: P(dimX - 0.6, plan.height / 2), size: 9)
+        text(ctx, String(Int((plan.height * 1000).rounded())), at: P(dimX - 0.6, plan.height / 2), size: 9, outlined: cad)
 
         // 표제란
         let tb = CGRect(x: page.width - 330, y: page.height - 120, width: 290, height: 80)
         ctx.setLineWidth(0.6)
         ctx.stroke(tb)
-        text(ctx, plan.title, at: CGPoint(x: tb.midX, y: tb.minY + 20), size: 11)
-        text(ctx, "영업장 평면도", at: CGPoint(x: tb.midX, y: tb.minY + 42), size: 9)
-        text(ctx, "축척 1:\(plan.scale)", at: CGPoint(x: tb.midX, y: tb.minY + 62), size: 9)
+        text(ctx, plan.title, at: CGPoint(x: tb.midX, y: tb.minY + 20), size: 11, outlined: cad)
+        text(ctx, "영업장 평면도", at: CGPoint(x: tb.midX, y: tb.minY + 42), size: 9, outlined: cad)
+        text(ctx, "축척 1:\(plan.scale)", at: CGPoint(x: tb.midX, y: tb.minY + 62), size: 9, outlined: cad)
     }
 
     static func wallPoints(_ wall: SamplePlan.Wall, _ s: Double, _ e: Double, _ plan: SamplePlan) -> (Point, Point) {
@@ -268,9 +292,9 @@ public enum SamplePlanRenderer {
         }
     }
 
-    /// 문짝(경첩 → 열린 위치) 선 + 열린 위치 → 닫힌 위치 사분원.
-    static func drawDoor(_ ctx: CGContext, hinge: CGPoint, closedEnd: CGPoint, openEnd: CGPoint) {
-        ctx.setLineWidth(0.5)
+    /// 문짝(경첩 → 열린 위치) 선 + 열린 위치 → 닫힌 위치 사분원. polyline = 사분원을 직선 12조각으로.
+    static func drawDoor(_ ctx: CGContext, hinge: CGPoint, closedEnd: CGPoint, openEnd: CGPoint, polyline: Bool = false) {
+        ctx.setLineWidth(polyline ? 0.36 : 0.5)
         ctx.move(to: hinge)
         ctx.addLine(to: openEnd)
         ctx.strokePath()
@@ -281,11 +305,18 @@ public enum SamplePlanRenderer {
         while delta > .pi { delta -= 2 * .pi }
         while delta < -.pi { delta += 2 * .pi }
         ctx.move(to: openEnd)
-        ctx.addArc(center: hinge, radius: r, startAngle: a0, endAngle: a0 + delta, clockwise: delta < 0)
+        if polyline {
+            for i in 1...12 {
+                let a = a0 + delta * CGFloat(i) / 12
+                ctx.addLine(to: CGPoint(x: hinge.x + r * cos(a), y: hinge.y + r * sin(a)))
+            }
+        } else {
+            ctx.addArc(center: hinge, radius: r, startAngle: a0, endAngle: a0 + delta, clockwise: delta < 0)
+        }
         ctx.strokePath()
     }
 
-    static func text(_ ctx: CGContext, _ string: String, at center: CGPoint, size: CGFloat) {
+    static func text(_ ctx: CGContext, _ string: String, at center: CGPoint, size: CGFloat, outlined: Bool = false) {
         let font = CTFontCreateWithName("AppleSDGothicNeo-Regular" as CFString, size, nil)
         let attrs: [NSAttributedString.Key: Any] = [
             NSAttributedString.Key(kCTFontAttributeName as String): font,
@@ -293,6 +324,28 @@ public enum SamplePlanRenderer {
         ]
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: string, attributes: attrs))
         let bounds = CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
+        if outlined {
+            // 글자를 외곽선 도형으로(글자 정보 없이) 칠한다 — CAD 「글자 → 도형」 출력 흉내.
+            ctx.saveGState()
+            ctx.setLineWidth(0.12)
+            let origin = CGPoint(x: center.x - bounds.width / 2, y: center.y + bounds.height / 2)
+            for run in (CTLineGetGlyphRuns(line) as? [CTRun]) ?? [] {
+                let n = CTRunGetGlyphCount(run)
+                var glyphs = [CGGlyph](repeating: 0, count: n)
+                var positions = [CGPoint](repeating: .zero, count: n)
+                CTRunGetGlyphs(run, CFRange(location: 0, length: n), &glyphs)
+                CTRunGetPositions(run, CFRange(location: 0, length: n), &positions)
+                for i in 0..<n {
+                    var t = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: origin.x + positions[i].x, ty: origin.y - positions[i].y)
+                    if let path = CTFontCreatePathForGlyph(font, glyphs[i], &t) {
+                        ctx.addPath(path)
+                    }
+                }
+            }
+            ctx.fillPath()
+            ctx.restoreGState()
+            return
+        }
         ctx.saveGState()
         ctx.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
         ctx.textPosition = CGPoint(x: center.x - bounds.width / 2, y: center.y + bounds.height / 2)

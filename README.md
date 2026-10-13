@@ -45,7 +45,7 @@
 ## 빌드·시험
 
 ```sh
-# 로직 시험 (macOS) — 66개
+# 로직 시험 (macOS) — 61개
 cd packages/SafeCertKit && swift test
 
 # iPad 앱 빌드 (시뮬레이터)

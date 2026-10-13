@@ -29,7 +29,12 @@ struct ProjectView: View {
                         ConfirmView(project: project, prepared: prepared) { Task { await judge() } }
                     }
                 } else {
-                    ProgressView("도면 해석 중").frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 10) {
+                        ProgressView("도면 해석 중")
+                        Text("글자가 외곽선으로 출력된 도면이면 기기 내 글자 인식에 수십 초 걸릴 수 있다(처음 한 번).")
+                            .font(Theme.captionFont).foregroundStyle(Theme.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .overlay {
@@ -60,7 +65,13 @@ struct ProjectView: View {
         prepared = nil
         prepareError = nil
         do {
-            prepared = try await AnalysisPipeline.prepare(pdf: project.pdfData, pageIndex: project.pageIndex)
+            let page = project.pageIndex
+            let result = try await AnalysisPipeline.prepare(pdf: project.pdfData, pageIndex: page, cachedTexts: project.recognizedTexts(page: page))
+            if let texts = result.recognizedTexts, project.recognizedTexts(page: page) == nil {
+                project.storeRecognizedTexts(texts, page: page)
+                try? context.save()
+            }
+            prepared = result
         } catch {
             prepareError = "PDF 를 열 수 없다. CAD 에서 직접 출력한 벡터 PDF 를 올려 주세요."
         }

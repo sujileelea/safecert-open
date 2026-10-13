@@ -18,6 +18,8 @@ final class ReviewProject {
     /// 사용자가 직접 입력한 축척 1:N.
     var scaleRatioOverride: Int?
     var sampleID: String?
+    /// 글자 외곽선 도면에서 기기 내 글자 인식으로 읽은 글자(페이지 번호 → 글자). 다시 열 때 재사용.
+    var recognizedTextsData: Data?
     @Relationship(deleteRule: .cascade, inverse: \AnalysisRecord.project)
     var analyses: [AnalysisRecord] = []
 
@@ -44,6 +46,18 @@ final class ReviewProject {
     }
 
     var latestAnalysis: AnalysisRecord? { analyses.max { $0.createdAt < $1.createdAt } }
+
+    func recognizedTexts(page: Int) -> [TextRun]? {
+        guard let data = recognizedTextsData,
+              let all = try? JSONDecoder().decode([String: [TextRun]].self, from: data) else { return nil }
+        return all[String(page)]
+    }
+
+    func storeRecognizedTexts(_ texts: [TextRun], page: Int) {
+        var all = recognizedTextsData.flatMap { try? JSONDecoder().decode([String: [TextRun]].self, from: $0) } ?? [:]
+        all[String(page)] = texts
+        recognizedTextsData = try? JSONEncoder().encode(all)
+    }
 
     /// 판정에 쓸 축척: 직접 입력 > 자동 추정(확인 토글 반영).
     func effectiveScale(_ estimate: ScaleEstimate?) -> ScaleEstimate? {

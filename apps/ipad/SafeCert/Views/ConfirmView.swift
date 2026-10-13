@@ -54,7 +54,7 @@ struct ConfirmView: View {
             scaleRow
             Divider()
             row("영업장 바닥면적", value: area, source: scale?.confirmed == true ? "도면 계산" : nil)
-            row("구획된 실", value: plan.rooms.isEmpty ? "없음" : "\(plan.rooms.count)개 · " + plan.rooms.compactMap(\.label).joined(separator: ", "), source: "도면")
+            row("구획된 실", value: roomsText, source: "도면")
             row("주된 출입구", value: doorText(plan.mainEntrances), source: "도면")
             row("비상구", value: doorText(plan.emergencyExits), source: "도면")
             ForEach(plan.notes, id: \.self) { note in
@@ -92,12 +92,22 @@ struct ConfirmView: View {
             if let s = scale {
                 Text("\(s.source.displayName) · " + (s.isCrossValidated ? "치수 \(s.crossChecks)개 교차검증 일치" : "교차검증 \(s.crossChecks)개 · 어긋남 \(s.conflicts)개"))
                     .font(Theme.captionFont).foregroundStyle(Theme.secondary)
+                if s.source == .dimensions, let first = s.evidence.first, first.contains("다름") {
+                    Label(first, systemImage: "exclamationmark.triangle")
+                        .font(Theme.captionFont).foregroundStyle(Theme.color(.orange))
+                }
             }
             if scale?.confirmed != true {
                 Text("축척을 확인하기 전에는 거리·폭 판정을 하지 않는다(회색).")
                     .font(Theme.captionFont).foregroundStyle(Theme.color(.orange))
             }
         }
+    }
+
+    private var roomsText: String {
+        guard !plan.rooms.isEmpty else { return "없음" }
+        let labels = plan.rooms.compactMap(\.label)
+        return labels.isEmpty ? "\(plan.rooms.count)개" : "\(plan.rooms.count)개 · " + labels.joined(separator: ", ")
     }
 
     private var area: String {

@@ -8,22 +8,29 @@ public enum PlanInterpreter {
     public static func interpret(_ page: VectorPage) -> PlanModel {
         var notes: [String] = []
 
-        // 1. 벽 = 굵은 선. 기준 = 가장 굵은 선의 45% 이상(최소 1.2pt).
-        let stroked = page.strokes.filter(\.isStroked)
-        let maxWidth = stroked.map(\.lineWidth).max() ?? 0
-        let wallThreshold = max(1.2, maxWidth * 0.45)
+        // 1. 벽 = 도면 안에서 상대적으로 굵은 선 층(절대 굵기는 출력 축척·용지마다 다르다).
+        //    CAD 는 벽을 선으로도, 칠한 도형(단면 채움)으로도 출력하므로 둘 다 본다.
+        let stroked = page.strokes.filter { $0.isStroked || $0.isFilled }
+        let wallClass = wallWidthClass(stroked)
+        let wallThreshold = max(0.2, wallClass * 0.6)
         let wallSegments = stroked.filter { $0.lineWidth >= wallThreshold }.flatMap(\.segments)
         let thinSegments = stroked.filter { $0.lineWidth < wallThreshold }.flatMap(\.segments)
         if wallSegments.count < 4 {
-            notes.append("벽으로 볼 굵은 선이 부족하다(\(wallSegments.count)개). 벽을 굵은 선으로 출력한 CAD PDF 가 필요하다.")
+            notes.append("벽으로 볼 굵은 선이 부족하다(\(wallSegments.count)개). 벽을 다른 선보다 굵게 출력한 CAD PDF 가 필요하다.")
         }
-        let tolerance = max(1.5, maxWidth * 0.75)
+        let tolerance = max(1.5, wallClass * 0.75)
 
-        // 2. 문 = 원호(스윕 60~120°) + 경첩에서 나가는 문짝 선.
+        // 2. 문 = 원호(스윕 60~120°) + 경첩에서 나가는 문짝 선. 원호는 곡선 또는 짧은 직선 조각으로 그려진다.
         var rawDoors: [(hinge: Point, closed: Point, open: Point, radius: Double)] = []
-        for run in stroked.flatMap(\.curveRuns) {
-            guard let arc = Arc.fit(run), arc.sweepDegrees >= 60, arc.sweepDegrees <= 120,
-                  arc.radius >= 8, arc.radius <= 150 else { continue }
+        // 원호 후보는 「그린 선」에서만 찾는다(칠한 도형 = 벽 단면·글자 외곽선의 곡선은 문이 아니다).
+        func doorLike(_ a: Arc) -> Bool { a.sweepDegrees >= 60 && a.sweepDegrees <= 120 && a.radius >= 8 && a.radius <= 150 }
+        let drawn = page.strokes.filter(\.isStroked)
+        let curveArcs = drawn.flatMap(\.curveRuns).compactMap { Arc.fit($0) }.filter(doorLike)
+        let thinDrawn = drawn.filter { $0.lineWidth < wallThreshold }.flatMap(\.segments)
+        let polyArcs = polylineArcs(thinDrawn).filter(doorLike).filter { p in
+            !curveArcs.contains { $0.center.distance(to: p.center) < 1 && abs($0.radius - p.radius) < 1 }
+        }
+        for arc in curveArcs + polyArcs {
             let hinge = arc.center
             let leafAtStart = thinSegments.contains { touches($0, hinge, arc.start, tolerance) }
             let leafAtEnd = thinSegments.contains { touches($0, hinge, arc.end, tolerance) }
@@ -44,8 +51,22 @@ public enum PlanInterpreter {
         // 3. 벽 + 문 개구부 현으로 면 추출 → 외곽선·실.
         let chords = rawDoors.map { Segment($0.hinge, $0.closed) }
         let faces = PlanarGraph.faces(from: wallSegments + chords, tolerance: tolerance)
+        // 벽 묶음의 외곽 껍질: 닫힌 외곽 면이 페이지 테두리이거나 껍질보다 훨씬 작으면(창·문 틈으로 외곽이 열린 두 줄 벽) 껍질을 쓴다.
+        let hull = buildingHull(wallSegments, pageDiagonal: (page.width * page.width + page.height * page.height).squareRoot())
         var boundary = faces.outer
         var boundaryConfidence = 0.9
+        let pageArea = page.width * page.height
+        if let outer = boundary, outer.area > pageArea * 0.7 {
+            boundary = nil
+        }
+        if let outer = boundary, let hull, outer.area < hull.area * 0.6 {
+            boundary = nil
+        }
+        if boundary == nil || (boundary?.area ?? 0) < 100, let hull, hull.area > 100 {
+            boundary = hull
+            boundaryConfidence = 0.7
+            notes.append("벽이 닫힌 외곽을 이루지 않아(창·문 틈) 벽 묶음의 외곽 껍질을 영업장 외곽으로 추정했다.")
+        }
         if boundary == nil || (boundary?.area ?? 0) < 100 {
             if !wallSegments.isEmpty {
                 let r = Rect(points: wallSegments.flatMap { [$0.a, $0.b] })
@@ -62,7 +83,7 @@ public enum PlanInterpreter {
         var doors: [DoorObject] = []
         for (i, d) in rawDoors.enumerated() {
             let mid = Segment(d.hinge, d.closed).midpoint
-            let onBoundary = boundary.map { $0.distanceToBoundary(mid) <= tolerance * 1.5 } ?? false
+            let onBoundary = boundary.map { $0.distanceToBoundary(mid) <= max(tolerance * 1.5, $0.diameter * 0.012) } ?? false
             let outward = boundary.map { !$0.contains(d.open) }
             doors.append(DoorObject(
                 id: "D\(i + 1)",
@@ -88,6 +109,8 @@ public enum PlanInterpreter {
             let s = t.text.uppercased()
             if emergencyKeywords.contains(where: { s.contains($0) }) { return (idx, .emergencyExit) }
             if mainKeywords.contains(where: { s.contains($0) }) { return (idx, .mainEntrance) }
+            // CAD 약어 ENT(출입구) — 단어 단위로만
+            if s.range(of: #"(^|[^A-Z])ENT([^A-Z]|$)"#, options: .regularExpression) != nil { return (idx, .mainEntrance) }
             return nil
         }
         var pairs: [(dist: Double, door: Int, text: Int, role: DoorRole)] = []
@@ -157,6 +180,13 @@ public enum PlanInterpreter {
             }
         }
 
+        // 공동주택·여러 세대 표기 → 다중이용업소 영업장 도면이 아닐 수 있음을 알린다.
+        let allText = page.texts.map(\.text).joined(separator: " ")
+        let unitMarks = allText.matches(of: /\d{3}\s*(~\s*\d{3})?\s*호/).count
+        if unitMarks >= 2 || ["오피스텔", "아파트", "다세대", "다가구", "공동주택", "세대"].contains(where: { allText.contains($0) }) {
+            notes.append("도면에 여러 세대(호)·공동주택 표기가 있다. 다중이용업소 영업장 평면이 아니면 조건에서 「다중이용업소 영업장」을 끄면 대상 외로 처리된다.")
+        }
+
         return PlanModel(
             pageWidth: page.width,
             pageHeight: page.height,
@@ -169,6 +199,91 @@ public enum PlanInterpreter {
             texts: page.texts,
             notes: notes
         )
+    }
+
+    /// 벽 층 굵기: 선분 수가 전체의 1%(최소 4개) 이상인 굵기 중 가장 굵은 것.
+    static func wallWidthClass(_ strokes: [Stroke]) -> Double {
+        var counts: [Double: Int] = [:]
+        for s in strokes { counts[(s.lineWidth * 100).rounded() / 100, default: 0] += s.segments.count }
+        let total = counts.values.reduce(0, +)
+        let minCount = max(4, total / 100)
+        return counts.filter { $0.value >= minCount }.keys.max() ?? counts.keys.max() ?? 0
+    }
+
+    /// 짧은 직선 조각을 끝점으로 이어 원호(문 열림 궤적)를 찾는다. 급하게 꺾이는 곳(35° 초과)에서 끊는다.
+    static func polylineArcs(_ segments: [Segment]) -> [Arc] {
+        let short = segments.filter { $0.length > 0.05 && $0.length <= 25 }
+        guard short.count >= 4 else { return [] }
+        func key(_ p: Point) -> GridKey2 { GridKey2(x: Int((p.x * 20).rounded()), y: Int((p.y * 20).rounded())) }
+        var byVertex: [GridKey2: [Int]] = [:]
+        for (i, s) in short.enumerated() {
+            byVertex[key(s.a), default: []].append(i)
+            byVertex[key(s.b), default: []].append(i)
+        }
+        var used = Set<Int>()
+        var arcs: [Arc] = []
+        /// i 번 선분에서 끝점 from 쪽으로 이어지는 다음 선분(차수 2 정점에서만, 완만한 꺾임만).
+        func next(_ i: Int, at p: Point) -> (Int, Point)? {
+            let k = key(p)
+            guard let list = byVertex[k], list.count == 2, let j = list.first(where: { $0 != i }), !used.contains(j) else { return nil }
+            let s = short[i], t = short[j]
+            let far = key(t.a) == k ? t.b : t.a
+            let d1 = (p - (key(s.a) == k ? s.b : s.a)).normalized
+            let d2 = (far - p).normalized
+            let turn = acos(max(-1, min(1, d1.dot(d2)))) * 180 / .pi
+            let ratio = max(s.length, t.length) / max(min(s.length, t.length), 1e-6)
+            guard turn <= 35, ratio <= 3 else { return nil }
+            return (j, far)
+        }
+        for i in short.indices.sorted(by: { (short[$0].a.y, short[$0].a.x) < (short[$1].a.y, short[$1].a.x) }) where !used.contains(i) {
+            used.insert(i)
+            var pts = [short[i].a, short[i].b]
+            var cur = i
+            while let (j, far) = next(cur, at: pts.last!) {
+                used.insert(j)
+                pts.append(far)
+                cur = j
+            }
+            cur = i
+            while let (j, far) = next(cur, at: pts.first!) {
+                used.insert(j)
+                pts.insert(far, at: 0)
+                cur = j
+            }
+            if pts.count >= 5, let arc = Arc.fit(points: pts, tolerance: 0.04) { arcs.append(arc) }
+        }
+        return arcs
+    }
+
+    /// 벽 선분을 근접 군집으로 묶어 가장 넓은 군집의 볼록 껍질.
+    static func buildingHull(_ walls: [Segment], pageDiagonal: Double) -> Polygon? {
+        guard walls.count >= 8 else { return nil }
+        let gap = pageDiagonal * 0.04
+        let boxes = walls.map { Rect(points: [$0.a, $0.b]).insetBy(-gap / 2) }
+        var parent = Array(walls.indices)
+        func find(_ x: Int) -> Int {
+            var x = x
+            while parent[x] != x { parent[x] = parent[parent[x]]; x = parent[x] }
+            return x
+        }
+        for i in walls.indices {
+            for j in (i + 1)..<walls.count {
+                let a = boxes[i], b = boxes[j]
+                if a.maxX < b.minX || b.maxX < a.minX || a.maxY < b.minY || b.maxY < a.minY { continue }
+                let ri = find(i), rj = find(j)
+                if ri != rj { parent[max(ri, rj)] = min(ri, rj) }
+            }
+        }
+        // 가장 넓은 땅을 차지하는 군집(범위 사각형 넓이) = 건물. 로고·표제란처럼 선이 촘촘한 작은 군집을 피한다.
+        var members: [Int: [Int]] = [:]
+        for i in walls.indices { members[find(i), default: []].append(i) }
+        let spans = members.mapValues { idx -> Double in
+            let r = Rect(points: idx.flatMap { [walls[$0].a, walls[$0].b] })
+            return idx.count >= 8 ? r.width * r.height : 0
+        }
+        guard let best = spans.max(by: { ($0.value, -$0.key) < ($1.value, -$1.key) })?.key, spans[best, default: 0] > 0 else { return nil }
+        let pts = walls.indices.filter { find($0) == best }.flatMap { [walls[$0].a, walls[$0].b] }
+        return Polygon.convexHull(pts).map { PlanarGraph.canonical($0) }
     }
 
     /// 선분이 두 점을 잇는가(허용 거리 안).
@@ -197,4 +312,9 @@ public enum PlanInterpreter {
     static func label(in polygon: Polygon, texts: [TextRun], excluding: [Polygon]) -> String? {
         texts.first { t in polygon.contains(t.center) && !excluding.contains { $0.contains(t.center) } }?.text
     }
+}
+
+struct GridKey2: Hashable {
+    let x: Int
+    let y: Int
 }

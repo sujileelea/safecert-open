@@ -19,8 +19,11 @@ public enum PlanarGraph {
 
         // 1. 분할점 수집: 교차점 + T 접합(끝점이 다른 선분 위에 있는 경우)
         var cuts: [[Double]] = Array(repeating: [0, 1], count: segs.count)
+        let boxes = segs.map { Rect(points: [$0.a, $0.b]).insetBy(-tolerance) }
         for i in segs.indices {
             for j in (i + 1)..<segs.count {
+                let bi = boxes[i], bj = boxes[j]
+                if bi.maxX < bj.minX || bj.maxX < bi.minX || bi.maxY < bj.minY || bj.maxY < bi.minY { continue }
                 let s = segs[i], o = segs[j]
                 if let p = s.intersection(with: o) {
                     cuts[i].append(param(of: p, on: s))

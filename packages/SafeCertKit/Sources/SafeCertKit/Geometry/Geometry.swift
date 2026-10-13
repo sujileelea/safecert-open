@@ -235,22 +235,26 @@ public struct Arc: Hashable, Codable, Sendable {
     /// 연속된 곡선 묶음(한 원호가 여러 베지어로 나뉜 경우 포함)이 원호인지 맞춘다.
     /// 표본점 전부가 한 원 위에 있으면(상대 오차 3% 이하) 원호로 본다.
     public static func fit(_ curves: [Cubic]) -> Arc? {
-        guard let first = curves.first, let last = curves.last else { return nil }
-        let pts = curves.flatMap { $0.sampled(6) }
-        guard pts.count >= 5 else { return nil }
+        guard curves.first != nil else { return nil }
+        return fit(points: curves.flatMap { $0.sampled(6) })
+    }
+
+    /// 순서 있는 점열(직선 조각으로 그린 원호 포함)이 원호인지 맞춘다.
+    public static func fit(points pts: [Point], tolerance: Double = 0.03) -> Arc? {
+        guard pts.count >= 5, let first = pts.first, let last = pts.last else { return nil }
         let a = pts[0], b = pts[pts.count / 2], c = pts[pts.count - 1]
         guard let center = circumcenter(a, b, c) else { return nil }
         let r = center.distance(to: a)
         guard r > 1e-6 else { return nil }
         let maxDev = pts.map { abs($0.distance(to: center) - r) / r }.max() ?? 1
-        guard maxDev < 0.03 else { return nil }
+        guard maxDev < tolerance else { return nil }
         // 각도 누적으로 스윕 계산
         var sweep = 0.0
         for i in 1..<pts.count {
             let v1 = pts[i - 1] - center, v2 = pts[i] - center
             sweep += atan2(v1.cross(v2), v1.dot(v2))
         }
-        return Arc(center: center, radius: r, start: first.p0, end: last.p3, sweepDegrees: abs(sweep) * 180 / .pi)
+        return Arc(center: center, radius: r, start: first, end: last, sweepDegrees: abs(sweep) * 180 / .pi)
     }
 
     static func circumcenter(_ a: Point, _ b: Point, _ c: Point) -> Point? {
@@ -260,5 +264,26 @@ public struct Arc: Hashable, Codable, Sendable {
         let ux = (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d
         let uy = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d
         return Point(ux, uy)
+    }
+}
+
+public extension Polygon {
+    /// 점들의 볼록 껍질(단조 사슬). 3점 미만이면 nil.
+    static func convexHull(_ points: [Point]) -> Polygon? {
+        let pts = Array(Set(points)).sorted { ($0.x, $0.y) < ($1.x, $1.y) }
+        guard pts.count >= 3 else { return nil }
+        func cross(_ o: Point, _ a: Point, _ b: Point) -> Double { (a - o).cross(b - o) }
+        var lower: [Point] = []
+        for p in pts {
+            while lower.count >= 2 && cross(lower[lower.count - 2], lower[lower.count - 1], p) <= 0 { lower.removeLast() }
+            lower.append(p)
+        }
+        var upper: [Point] = []
+        for p in pts.reversed() {
+            while upper.count >= 2 && cross(upper[upper.count - 2], upper[upper.count - 1], p) <= 0 { upper.removeLast() }
+            upper.append(p)
+        }
+        let hull = Array(lower.dropLast() + upper.dropLast())
+        return hull.count >= 3 ? Polygon(hull) : nil
     }
 }

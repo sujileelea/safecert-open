@@ -7,7 +7,7 @@
 | 항목 | 내용 |
 |---|---|
 | 형태 | **iPad 전용 네이티브 앱** — SwiftUI · SwiftData · Apple 퍼스트파티 프레임워크만(외부 의존성 0, 서버 없음) |
-| 대상 | 다중이용업소 영업장 평면도 · CAD 에서 출력한 **벡터 PDF** |
+| 대상 | 다중이용업소 영업장 평면도 · CAD 에서 출력한 **벡터 PDF**(글자를 외곽선으로 출력한 도면은 기기 내 글자 인식 Vision 으로 읽음) |
 | 규칙 | 비상구 설치(시행령 별표 1의2 제2호·고시) · 비상구 위치 이격(시행규칙 별표 2 제2호가목1) · 비상구등 규격(같은 목 2) |
 | 법령 | 매일 05:00 KST 국가법령정보 공동활용 API 실측 → 조문 정규화(독립 코드 파서 2종) → 코드 검증 5종 → 법령 스냅샷. 앱 실행·판정 직전에 당일 스냅샷이 없으면 즉시 실측 |
 | 판정 | 결정적 규칙 엔진. LLM 불관여. 판단 불가 항목은 초록 금지 |
@@ -33,19 +33,19 @@
 |---|---|
 | `packages/SafeCertKit` | 순수 로직 Swift 패키지(iOS·macOS 26) |
 | ├ `Geometry` | 점·선분·다각형·원호 맞춤·평면 그래프 면 추출 |
-| ├ `Drawing` | 벡터 PDF 해석(CGPDFScanner·PDFKit) · 페이지 렌더러 |
-| ├ `Plan` | 평면 해석(벽·문·외곽·실·출입구 역할·문 규격) · 축척 추정 |
+| ├ `Drawing` | 벡터 PDF 해석(CGPDFScanner·PDFKit) · 외곽선 글자 인식(Vision, 0°·90°·270°) · 페이지 렌더러 |
+| ├ `Plan` | 평면 해석(상대 굵기 벽 층·곡선/직선 조각 원호 문·외곽·실·출입구 역할·문 규격) · 축척 추정(표기 + 치수 교차검증, 축소·확대 인쇄 감지) |
 | ├ `Law` | 법령 API · 응답 해석 · 조문 추출 · 정규화 · 코드 검증 · 스냅샷 |
 | ├ `Rules` | 규칙 엔진 · 조건 · 판정 모델 · 회귀 세트 |
 | ├ `Explain` | 판정 설명 7단 · 쉬운 말 초안 |
-| ├ `Samples` | 시연용 샘플 도면 3종(CoreGraphics 생성) |
+| ├ `Samples` | 시연용 샘플 도면 3종(CoreGraphics 생성, 일반형·CAD 출력형) |
 | └ `Resources/LawSeed` | 법령 초기값(2026-10-12 API 응답 녹화). 첫 실행·오프라인 기준 |
 | `apps/ipad` | iPad 앱(SwiftUI · SwiftData · BackgroundTasks · Security) |
 
 ## 빌드·시험
 
 ```sh
-# 로직 시험 (macOS) — 58개
+# 로직 시험 (macOS) — 66개
 cd packages/SafeCertKit && swift test
 
 # iPad 앱 빌드 (시뮬레이터)
@@ -64,6 +64,19 @@ cd apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 | `-SafeCertDemoFloor yes\|no\|unknown` | 피난층 조건 |
 | `-SafeCertDemoSelect N` | N번째 판정 상세를 펼침 |
 | `-SafeCertDemoScreen law\|settings` | 법령 현황·설정 화면 |
+| `-SafeCertDemoFile <이름.pdf>` | 앱 Documents 의 PDF 로 검토 생성(`xcrun simctl get_app_container … data` 의 Documents 에 복사). `-SafeCertDemoStep result` 판정까지, `-SafeCertDemoMultiUse no` 다중이용업소 아님 |
+
+## 실도면 대응
+
+실제 CAD 출력 PDF 의 흔한 특성을 처리한다(2026-10-13 실도면 1건으로 확인).
+
+| 특성 | 처리 |
+|---|---|
+| 용지 맞춤 축소 인쇄(예: A3 1:150 → A4) | 치수 문자 다수가 가리키는 실제 출력 축척을 제시하고 표기와 다름을 경고 |
+| 글자 = 외곽선 도형 | 기기 내 Vision 글자 인식(세 방향·타일), 결과는 검토에 저장 |
+| 벽 = 칠한 단면, 얇은 펜 | 도면 안 상대 굵기로 벽 층 판별 |
+| 문 궤적 = 직선 조각 | 짧은 직선 사슬 원 맞춤 |
+| 창·문 틈으로 외곽이 열린 두 줄 벽 | 가장 넓은 벽 군집의 외곽 껍질(신뢰도 0.7 → 초록·빨강 없음) |
 
 ## 법령 API 인증값
 

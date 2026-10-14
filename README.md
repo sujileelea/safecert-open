@@ -106,5 +106,5 @@ cd ../../apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 
 ## 링크
 
-- 배포(TestFlight): 준비 중
+- 배포(TestFlight): 0.1.0 업로드 완료 · 외부 테스트 링크 준비 중
 - 발표 자료: 준비 중

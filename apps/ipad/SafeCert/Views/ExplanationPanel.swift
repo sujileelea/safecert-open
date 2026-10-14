@@ -71,12 +71,12 @@ struct ExplanationPanel: View {
 
     @ViewBuilder
     private var plainLanguage: some View {
-        if PlainLanguageDrafter.isAvailable {
+        if let client = KeychainStore.gemini {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("쉬운 말 요약").font(.system(size: 15, weight: .semibold))
                     Spacer()
-                    Chip(text: "기기 내 AI 초안 · 판정에 쓰지 않음")
+                    Chip(text: "외부 AI(Gemini) 초안 · 판정에 쓰지 않음")
                 }
                 if let plainDraft {
                     Text(plainDraft).font(Theme.bodyFont).foregroundStyle(Theme.ink)
@@ -84,11 +84,13 @@ struct ExplanationPanel: View {
                     Button(drafting ? "작성 중…" : "초안 만들기") {
                         drafting = true
                         Task {
-                            plainDraft = await PlainLanguageDrafter.draft(for: result) ?? "초안이 사실 대조를 통과하지 못해 표시하지 않는다."
+                            plainDraft = await PlainLanguageDrafter.draft(for: result, client: client) ?? "초안을 받지 못했거나 사실 대조를 통과하지 못해 표시하지 않는다."
                             drafting = false
                         }
                     }
                     .disabled(drafting)
+                    Text("누르면 판정 결과 글이 Google Gemini 로 전송된다(도면은 보내지 않음).")
+                        .font(.system(size: 12)).foregroundStyle(Theme.secondary)
                 }
             }
             .card()

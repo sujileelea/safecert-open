@@ -16,11 +16,15 @@ struct ReportSheet: View {
     @State private var working = false
     @State private var failure: String?
     @State private var fileURL: URL?
+    /// 외부 LLM 전송 확인을 기다리는 중.
+    @State private var askingConsent = false
 
     var body: some View {
         NavigationStack {
             Group {
-                if let data = record.reportData {
+                if askingConsent {
+                    consent
+                } else if let data = record.reportData {
                     PDFPreview(data: data)
                 } else if let failure {
                     ContentUnavailableView("보고서를 만들지 못했다", systemImage: "exclamationmark.triangle", description: Text(failure))
@@ -37,7 +41,7 @@ struct ReportSheet: View {
                 }
                 if record.reportData != nil {
                     ToolbarItem(placement: .secondaryAction) {
-                        Button("다시 작성") { Task { await make() } }
+                        Button("다시 작성") { start() }
                             .disabled(working)
                     }
                     if let fileURL {
@@ -49,8 +53,46 @@ struct ReportSheet: View {
             }
         }
         .task {
-            if record.reportData == nil { await make() } else { writeFile() }
+            if record.reportData == nil { start() } else { writeFile() }
         }
+    }
+
+    /// AI 키가 있으면 외부 전송 확인부터, 없으면 바로 규칙 엔진 문장으로.
+    private func start() {
+        if KeychainStore.gemini != nil {
+            askingConsent = true
+        } else {
+            Task { await make(useAI: false) }
+        }
+    }
+
+    private var consent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("AI 문장 작성을 위해 외부로 보냅니다").font(.system(size: 19, weight: .semibold))
+            VStack(alignment: .leading, spacing: 6) {
+                Label("보내는 것: 판정 결과 글(항목·색·읽은 값·기준)과 관련 법령 조문", systemImage: "arrow.up.doc")
+                Label("보내지 않는 것: 도면 파일·도면 이미지·검토 이름", systemImage: "lock")
+                Label("받는 곳: Google Gemini API(무료 티어) — 입력이 Google 제품 개선에 쓰일 수 있다", systemImage: "globe")
+                Label("판정·색·수치는 바뀌지 않는다. AI 문장은 「AI 작성」 표시와 함께 실린다", systemImage: "checkmark.seal")
+            }
+            .font(Theme.bodyFont)
+            .foregroundStyle(Theme.ink)
+            HStack(spacing: 12) {
+                Button("AI 없이 작성") {
+                    askingConsent = false
+                    Task { await make(useAI: false) }
+                }
+                .buttonStyle(.bordered)
+                Button("보내고 작성") {
+                    askingConsent = false
+                    Task { await make(useAI: true) }
+                }
+                .buttonStyle(PrimaryButtonStyle())
+            }
+        }
+        .padding(28)
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var progress: some View {
@@ -60,28 +102,30 @@ struct ReportSheet: View {
             VStack(alignment: .leading, spacing: 6) {
                 Label("판정 결과·조문 원문 묶기(규칙 엔진)", systemImage: "checkmark.seal")
                 Label("판정마다 관련 조문 검색", systemImage: "text.magnifyingglass")
-                Label(OnDeviceReportNarrator.isAvailable ? "기기 내 AI 로 설명 문장 작성 — 수십 초" : "이 기기에서 AI 를 쓸 수 없어 규칙 엔진 문장으로 작성",
-                      systemImage: "sparkles")
+                Label(usingAI ? "외부 AI(Gemini)로 설명 문장 작성 — 수십 초" : "AI 없이 규칙 엔진 문장으로 작성", systemImage: "sparkles")
                 Label("AI 문장 근거 대조 → PDF 조판", systemImage: "doc.richtext")
             }
             .font(Theme.captionFont)
             .foregroundStyle(Theme.secondary)
-            Text("도면과 결과는 기기 밖으로 나가지 않는다.").font(.system(size: 12)).foregroundStyle(Theme.secondary)
+            Text(usingAI ? "도면 파일·이미지는 보내지 않는다." : "아무것도 기기 밖으로 나가지 않는다.").font(.system(size: 12)).foregroundStyle(Theme.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func make() async {
+    @State private var usingAI = false
+
+    private func make(useAI: Bool) async {
         guard let snapshot = law.snapshot(id: record.snapshotID) else {
             failure = "판정에 쓴 법령 스냅샷(\(record.snapshotID))을 찾지 못했다. 최신 법령으로 다시 판정한 뒤 만들어 주세요."
             return
         }
         working = true
+        usingAI = useAI
         failure = nil
         record.reportData = nil
         let input = ReportInput(result: result, plan: prepared.plan, snapshot: snapshot, projectName: project.name,
                                 fileName: project.fileName, judgedAt: record.createdAt)
-        let narrator: (any ReportNarrating)? = OnDeviceReportNarrator.isAvailable ? OnDeviceReportNarrator() : nil
+        let narrator: (any ReportNarrating)? = useAI ? KeychainStore.gemini.map { GeminiReportNarrator(client: $0) } : nil
         let report = await ReportBuilder.build(input, narrator: narrator)
         let pdf = project.pdfData, page = project.pageIndex, plan = prepared.plan
         let data = await Task.detached { ReportPDF.render(report, drawing: pdf, pageIndex: page, plan: plan) }.value

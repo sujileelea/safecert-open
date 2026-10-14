@@ -74,6 +74,17 @@ struct ReportTests {
         #expect(NarrativeGuard.sentences("확인한다(비고 2)다. 다시 확인한다\n- 현장 확인") == ["확인한다(비고 2).", "다시 확인한다.", "현장 확인."])
     }
 
+    @Test func silentModelLeavesNoModelName() async throws {
+        struct Silent: ReportNarrating {
+            var modelName: String { "응답 없는 모델" }
+            func summary(facts: String) async -> String? { nil }
+            func verdict(facts: String, passages: String) async -> (explanation: String, nextSteps: [String])? { nil }
+        }
+        let report = await ReportBuilder.build(try await Self.input(), narrator: Silent(), now: RuleEngineTests.day)
+        #expect(report.model == nil)
+        #expect(report.aiSentenceCount == 0)
+    }
+
     @Test func guardRejectsWrongColorRulePairing() async throws {
         let r = try await Self.input().result
         // 샘플 B: 빨강 = 위치·규격, 주황 = 규격(주출입구), 초록 = 설치

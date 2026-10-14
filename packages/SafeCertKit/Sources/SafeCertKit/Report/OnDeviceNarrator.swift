@@ -1,4 +1,5 @@
 import Foundation
+import os
 #if canImport(FoundationModels)
 import FoundationModels
 
@@ -21,6 +22,8 @@ struct VerdictWriting {
 /// 같은 입력에 같은 글이 나오도록 탐욕 샘플링을 쓰고, 판정마다 새 세션을 연다(앞 판정 내용이 섞이지 않게).
 public struct OnDeviceReportNarrator: ReportNarrating {
     public init() {}
+
+    static let log = Logger(subsystem: "com.alnair.safecert", category: "report")
 
     public var modelName: String { "Apple 기기 내 모델(FoundationModels)" }
 
@@ -45,6 +48,7 @@ public struct OnDeviceReportNarrator: ReportNarrating {
                                                      options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 400))
             return response.content.summary
         } catch {
+            Self.log.error("요약 생성 실패: \(String(describing: error), privacy: .public)")
             return nil
         }
         #else
@@ -62,6 +66,7 @@ public struct OnDeviceReportNarrator: ReportNarrating {
                                                      options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 500))
             return (response.content.explanation, response.content.nextSteps)
         } catch {
+            Self.log.error("판정 설명 생성 실패: \(String(describing: error), privacy: .public)")
             return nil
         }
         #else

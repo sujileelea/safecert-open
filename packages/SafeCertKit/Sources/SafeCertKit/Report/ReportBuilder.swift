@@ -28,6 +28,7 @@ public enum ReportBuilder {
         let retriever = LawRetriever(passages: input.snapshot.passages ?? [])
 
         var sections: [ReportVerdictSection] = []
+        var responded = false
         for (i, v) in r.verdicts.enumerated() {
             let explanation = ExplanationComposer.explain(v, result: r, plan: input.plan, snapshot: input.snapshot)
             let related = retriever.search(query(for: v), limit: 2, excluding: explanation.citations.map(\.text))
@@ -36,6 +37,7 @@ public enum ReportBuilder {
             var narrative = ReportNarrative(sentences: fallbackExplanation(v), isAI: false)
             var nextSteps = ReportNarrative(sentences: v.checkItems.isEmpty ? ["추가 확인사항 없음."] : v.checkItems, isAI: false)
             if let narrator, let w = await narrator.verdict(facts: facts, passages: passageText(explanation.citations, related)) {
+                responded = true
                 let checked = NarrativeGuard.filter(NarrativeGuard.sentences(w.explanation), facts: facts)
                 if !checked.kept.isEmpty { narrative = ReportNarrative(sentences: checked.kept, isAI: true, dropped: checked.dropped) }
                 let steps = NarrativeGuard.filter(w.nextSteps.flatMap(NarrativeGuard.sentences), facts: facts)
@@ -48,6 +50,7 @@ public enum ReportBuilder {
         let facts = summaryFacts(r)
         var summary = ReportNarrative(sentences: ExplanationComposer.narrative(r), isAI: false)
         if let narrator, let text = await narrator.summary(facts: facts) {
+            responded = true
             let checked = NarrativeGuard.filter(NarrativeGuard.sentences(text), facts: facts, verdicts: r.verdicts)
             if !checked.kept.isEmpty { summary = ReportNarrative(sentences: checked.kept, isAI: true, dropped: checked.dropped) }
         }
@@ -73,7 +76,8 @@ public enum ReportBuilder {
             sections: sections,
             lawStatus: lawStatus,
             notes: r.notes,
-            model: narrator?.modelName
+            // 모델이 한 번도 답하지 못했으면(기기 미지원·오류) 모델 이름을 적지 않는다.
+            model: responded ? narrator?.modelName : nil
         )
     }
 

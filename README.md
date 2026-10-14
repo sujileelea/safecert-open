@@ -1,6 +1,6 @@
 # SafeCert
 
-평면도(PDF)를 올리면 현행 소방 법령 기준으로 도면 위에 안전상태를 색으로 표시하고, 사람이 항목마다 확인한 뒤, AI 가 쓴 설명을 담은 검토 보고서(PDF)로 내보내는 iPad 앱.
+평면도(PDF)를 올리면 현행 소방 법령 기준으로 도면 위에 안전상태를 색으로 표시하고, 사람이 항목마다 확인한 뒤, AI 가 쓴 설명을 담은 검토 보고서(PDF)로 내보내는 iPad·iPhone 앱.
 
 ## 프로젝트 소개
 
@@ -26,7 +26,7 @@
 
 | 영역 | 기술 |
 |---|---|
-| 앱 | iPad 앱 — Swift · SwiftUI · SwiftData (외부 라이브러리 없음) |
+| 앱 | iPad·iPhone 앱 — Swift · SwiftUI · SwiftData (외부 라이브러리 없음) |
 | 도면 읽기 | 애플 PDF 분석(CoreGraphics · PDFKit) · 글자 인식(Vision) |
 | 법령 | 국가법령정보 공동활용 Open API |
 | 생성형 AI | Google Gemini API (`gemini-3.5-flash-lite`, 무료 등급) |
@@ -67,7 +67,7 @@ flowchart LR
 
 ## 실행 방법
 
-요구: Mac(Xcode 27) · iPadOS 26 이상 iPad 또는 시뮬레이터
+요구: Mac(Xcode 27) · iPadOS·iOS 26 이상 iPad·iPhone 또는 시뮬레이터
 
 ```sh
 git clone https://github.com/sujileelea/safecert-open.git
@@ -106,5 +106,5 @@ cd ../../apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 
 ## 링크
 
-- 배포(TestFlight): 0.1.0 업로드 완료 · 외부 테스트 링크 준비 중
+- 배포(TestFlight): 0.1.0 업로드 완료(빌드 2부터 iPhone 포함) · 외부 테스트 링크 준비 중
 - 발표 자료: 준비 중

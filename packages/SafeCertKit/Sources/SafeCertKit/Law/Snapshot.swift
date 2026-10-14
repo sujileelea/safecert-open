@@ -87,6 +87,8 @@ public struct LawSnapshot: Identifiable, Hashable, Codable, Sendable {
     public var notices: [AdminRuleSearchEntry]
     public var events: [LawChangeEvent]
     public var collectionErrors: [String]
+    /// 조문 검색(RAG)용 법령 전문 구절. 이 필드가 생기기 전 스냅샷은 nil.
+    public var passages: [LawPassage]?
 
     public func clause(_ key: ClauseKey) -> LawClause? { clauses.first { $0.key == key } }
 
@@ -245,7 +247,9 @@ public enum LawSnapshotBuilder {
             pendingAmendments: pending,
             notices: notices,
             events: events,
-            collectionErrors: sources.errors
+            collectionErrors: sources.errors,
+            passages: PassageBuilder.merge(fresh: PassageBuilder.build(laws: sources.laws, notices: sources.notices),
+                                           previous: previous?.passages)
         )
     }
 

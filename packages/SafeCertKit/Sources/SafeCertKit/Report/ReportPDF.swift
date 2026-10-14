@@ -237,7 +237,8 @@ final class Composer {
 
     /// 서술 문단 — AI 문장은 연한 파랑 상자 + 「AI 작성」, 규칙 엔진 문장은 꼬리표만.
     func narrative(_ n: ReportNarrative, bullets: Bool = false) {
-        let body = bullets ? n.sentences.map { "• \($0)" }.joined(separator: "\n") : n.text
+        // AI 문장은 한 문단, 규칙 엔진 문장(마침표 없는 항목 줄)은 줄마다.
+        let body = bullets ? n.sentences.map { "• \($0)" }.joined(separator: "\n") : n.isAI ? n.text : n.sentences.joined(separator: "\n")
         let s = Style.text(body, Style.font(10), Style.ink, lineSpacing: 3.5)
         let pad: CGFloat = 9
         let h = measure(s, width: Page.contentWidth - pad * 2) + pad * 2 + 18

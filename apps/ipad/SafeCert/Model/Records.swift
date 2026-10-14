@@ -79,6 +79,9 @@ final class AnalysisRecord {
     var lawBaseDate: String
     var resultData: Data
     var project: ReviewProject?
+    /// 사전검토 보고서 PDF(X-01). 이 판정으로 만든 마지막 보고서.
+    @Attribute(.externalStorage) var reportData: Data?
+    var reportCreatedAt: Date?
 
     init(result: AnalysisResult) {
         id = UUID()

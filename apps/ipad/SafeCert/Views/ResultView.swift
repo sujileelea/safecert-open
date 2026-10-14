@@ -12,6 +12,7 @@ struct ResultView: View {
 
     @Environment(LawStore.self) private var law
     @State private var selectedID: String?
+    @State private var showingReport = false
 
     private var snapshot: LawSnapshot? { law.snapshot(id: record.snapshotID) }
 
@@ -39,11 +40,15 @@ struct ResultView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingReport) {
+            ReportSheet(project: project, prepared: prepared, record: record, result: result)
+        }
         #if DEBUG
         .onAppear {
             if let n = DemoLaunch.arguments["-SafeCertDemoSelect"].flatMap(Int.init), n >= 1, n <= result.verdicts.count {
                 selectedID = result.verdicts[n - 1].id
             }
+            if DemoLaunch.arguments["-SafeCertDemoStep"] == "report" { showingReport = true }
         }
         #endif
     }
@@ -58,7 +63,16 @@ struct ResultView: View {
             Spacer()
             Button("축척·조건 수정", action: onEdit)
             Button("최신 법령으로 다시 판정", action: onRejudge)
-                .fontWeight(.semibold)
+            Button {
+                showingReport = true
+            } label: {
+                Label(record.reportData == nil ? "보고서 PDF 만들기" : "보고서 PDF", systemImage: "doc.richtext")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Theme.ink, in: RoundedRectangle(cornerRadius: 9))
+            }
         }
         .font(Theme.bodyFont)
         .padding(.horizontal, 20)

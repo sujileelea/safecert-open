@@ -7,6 +7,7 @@ import SwiftData
 /// 실행 인자: `-SafeCertDemo sample-a|sample-b|sample-c` `-SafeCertDemoStep confirm|result` `-SafeCertDemoScreen law|settings`
 /// `-SafeCertDemoFloor yes|no|unknown` `-SafeCertDemoSelect <판정 순번>`
 /// `-SafeCertDemoFile <앱 Documents 안 PDF 이름>`(+ `-SafeCertDemoStep result` 판정까지, `-SafeCertDemoMultiUse no` 다중이용업소 아님)
+/// `-SafeCertDemoStep report` = 판정 후 보고서 PDF 작성 화면까지
 enum DemoLaunch {
     static var arguments: [String: String] {
         let a = ProcessInfo.processInfo.arguments
@@ -29,7 +30,7 @@ enum DemoLaunch {
             let project = ReviewProject(name: (file as NSString).deletingPathExtension, fileName: file, pdfData: data)
             if args["-SafeCertDemoMultiUse"] == "no" { project.conditions.isMultiUseBusiness = false }
             context.insert(project)
-            if args["-SafeCertDemoStep"] == "result" {
+            if ["result", "report"].contains(args["-SafeCertDemoStep"]) {
                 while law.current == nil || law.isSyncing { try? await Task.sleep(for: .milliseconds(200)) }
                 if let snapshot = law.current, let prepared = try? await AnalysisPipeline.prepare(pdf: data, pageIndex: 0) {
                     if let texts = prepared.recognizedTexts { project.storeRecognizedTexts(texts, page: 0) }

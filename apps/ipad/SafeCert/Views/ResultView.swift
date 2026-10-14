@@ -11,6 +11,7 @@ struct ResultView: View {
     let onRejudge: () -> Void
 
     @Environment(LawStore.self) private var law
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var selectedID: String?
     @State private var showingReport = false
 
@@ -54,7 +55,47 @@ struct ResultView: View {
         #endif
     }
 
+    @ViewBuilder
     private var actionBar: some View {
+        if sizeClass == .compact { compactActionBar } else { regularActionBar }
+    }
+
+    /// 아이폰: 날짜 한 줄 + [수정·다시 판정 메뉴] [보고서 PDF].
+    private var compactActionBar: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("법령 기준일 \(result.lawBaseDate)").font(Theme.captionFont).foregroundStyle(Theme.secondary)
+                if let current = law.current, current.id != result.snapshotID {
+                    Chip(text: "새 법령 있음", tint: Theme.color(.yellow))
+                }
+            }
+            HStack(spacing: 10) {
+                Menu {
+                    Button("축척·조건 수정", action: onEdit)
+                    Button("최신 법령으로 다시 판정", action: onRejudge)
+                } label: {
+                    Label("수정", systemImage: "slider.horizontal.3")
+                }
+                Spacer()
+                Button { showingReport = true } label: {
+                    Label("보고서 PDF", systemImage: "doc.richtext")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .fixedSize()
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Theme.ink, in: RoundedRectangle(cornerRadius: 9))
+                }
+            }
+        }
+        .font(Theme.bodyFont)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Theme.card)
+        .overlay(alignment: .bottom) { Divider() }
+    }
+
+    private var regularActionBar: some View {
         HStack(spacing: 12) {
             Text("판정 \(record.createdAt.formatted(date: .abbreviated, time: .shortened)) · 법령 기준일 \(result.lawBaseDate)")
                 .font(Theme.captionFont).foregroundStyle(Theme.secondary)

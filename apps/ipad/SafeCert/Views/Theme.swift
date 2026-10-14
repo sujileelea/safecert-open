@@ -81,6 +81,8 @@ struct Chip: View {
 /// 업로드 → 확인 → 판정 → 결과 4단계 표시.
 struct StepperBar: View {
     let current: Int
+    /// 좁은 화면(아이폰)은 현재 단계 이름만 보인다.
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     private let steps = ["업로드", "확인", "판정", "결과"]
 
@@ -96,10 +98,13 @@ struct StepperBar: View {
                             Text("\(i + 1)").font(.system(size: 11, weight: .semibold)).foregroundStyle(i <= current ? .white : Theme.secondary)
                         }
                     }
-                    Text(title).font(Theme.captionFont).foregroundStyle(i <= current ? Theme.ink : Theme.secondary)
+                    if sizeClass != .compact || i == current {
+                        Text(title).font(Theme.captionFont).foregroundStyle(i <= current ? Theme.ink : Theme.secondary)
+                            .fixedSize()
+                    }
                 }
                 if i < steps.count - 1 {
-                    Rectangle().fill(i < current ? Theme.ink : Theme.hairline).frame(width: 28, height: 1)
+                    Rectangle().fill(i < current ? Theme.ink : Theme.hairline).frame(width: sizeClass == .compact ? 14 : 28, height: 1)
                 }
             }
         }

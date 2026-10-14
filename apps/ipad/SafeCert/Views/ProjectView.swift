@@ -8,6 +8,7 @@ struct ProjectView: View {
 
     @Environment(LawStore.self) private var law
     @Environment(\.modelContext) private var context
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     @State private var prepared: PreparedDrawing?
     @State private var prepareError: String?
@@ -54,7 +55,9 @@ struct ProjectView: View {
         HStack {
             StepperBar(current: showingResult ? 3 : 1)
             Spacer()
-            Text(project.fileName).font(Theme.captionFont).foregroundStyle(Theme.secondary)
+            if sizeClass != .compact {
+                Text(project.fileName).font(Theme.captionFont).foregroundStyle(Theme.secondary)
+            }
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)

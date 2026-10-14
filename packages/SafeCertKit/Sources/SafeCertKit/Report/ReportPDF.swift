@@ -293,9 +293,9 @@ final class Composer {
         }
         space(10)
 
-        // 전체 판정 상자(V-07)
+        // 전체 판정 상자(V-07) + 검토자 확인 수
         let boxTop = cursor
-        let boxH: CGFloat = 78
+        let boxH: CGFloat = 98
         ctx.setFillColor(Style.card)
         ctx.addPath(CGPath(roundedRect: rect(x: Page.margin, top: boxTop, width: Page.contentWidth, height: boxH), cornerWidth: 8, cornerHeight: 8, transform: nil))
         ctx.fillPath()
@@ -312,6 +312,10 @@ final class Composer {
             drawLine(t, x: cx + 12, baselineFromTop: boxTop + 66.5)
             cx += lineWidth(t) + 26
         }
+        let n = report.confirmedCount, total = report.sections.count
+        let confirm = Style.text("검토자 확인 \(n) / \(total)건" + (n < total ? " · 미확인 \(total - n)건" : " · 전 항목 확인"),
+                                 Style.font(9.5, "SemiBold"), n < total ? Style.color(.orange) : Style.color(.green))
+        drawLine(confirm, x: Page.margin + 14, baselineFromTop: boxTop + 87)
         cursor = boxTop + boxH + 14
 
         heading("요약", size: 12, before: 0)
@@ -339,6 +343,9 @@ final class Composer {
         numberBadge(s.number, color: Style.color(v.color), center: CGPoint(x: Page.margin + 9, y: Page.height - top - 9), radius: 9)
         let fs = CTFramesetterCreateWithAttributedString(text)
         CTFrameDraw(CTFramesetterCreateFrame(fs, CFRange(location: 0, length: 0), CGPath(rect: rect(x: Page.margin + 30, top: top, width: Page.contentWidth - 30, height: h), transform: nil), nil), ctx)
+        let mark = Style.text(s.confirmedAt == nil ? "☐ 미확인" : "☑ 확인", Style.font(9.5, "SemiBold"),
+                              s.confirmedAt == nil ? Style.secondary : Style.color(.green))
+        drawLine(mark, x: Page.width - Page.margin - lineWidth(mark), baselineFromTop: top + 11)
         cursor = top + max(h, 18) + 6
         hairline(top: cursor - 3)
     }
@@ -435,6 +442,16 @@ final class Composer {
                 ctx.strokeLineSegments(between: [anchor, at])
             }
             numberBadge(section.number, color: Style.color(v.color), center: at, radius: 9)
+            if section.confirmedAt != nil {
+                // 검토자 확인 = 오른쪽 위 초록 체크
+                let c = CGPoint(x: at.x + 7.5, y: at.y + 7.5)
+                ctx.setFillColor(Style.color(.green))
+                ctx.fillEllipse(in: CGRect(x: c.x - 5, y: c.y - 5, width: 10, height: 10))
+                ctx.setStrokeColor(Style.rgb(0xFFFFFF))
+                ctx.setLineWidth(1.4)
+                ctx.addLines(between: [CGPoint(x: c.x - 2.6, y: c.y), CGPoint(x: c.x - 0.6, y: c.y - 2), CGPoint(x: c.x + 2.8, y: c.y + 2.2)])
+                ctx.strokePath()
+            }
             placed.append(at)
         }
         ctx.restoreGState()
@@ -478,7 +495,12 @@ final class Composer {
         drawLine(Style.text(v.target, Style.font(9.5), Style.secondary), x: Page.margin + 30, baselineFromTop: top + 30)
         var x = Page.margin + 30
         x += tag(v.color.meaning, color: Style.color(v.color), x: x, top: top + 37) + 5
-        tag(v.badge.displayName, color: Style.secondary, x: x, top: top + 37)
+        x += tag(v.badge.displayName, color: Style.secondary, x: x, top: top + 37) + 5
+        if let at = s.confirmedAt {
+            tag("☑ 검토자 확인 · \(Self.stamp(at))", color: Style.color(.green), x: x, top: top + 37)
+        } else {
+            tag("☐ 검토자 미확인", color: Style.color(.orange), x: x, top: top + 37)
+        }
         cursor = top + 58
         if !v.summary.isEmpty { flow(Style.text(v.summary, Style.font(10.5, "SemiBold")), after: 8) }
 
@@ -511,6 +533,14 @@ final class Composer {
             heading("법령 상태", size: 11, before: 4)
             flow(Style.text(v.lawFlags.map { "• \($0.text)" }.joined(separator: "\n"), Style.font(9.5)), after: 6)
         }
+    }
+
+    static func stamp(_ d: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "ko_KR")
+        f.timeZone = TimeZone(identifier: "Asia/Seoul")
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f.string(from: d)
     }
 
     /// 표 칸 너비로 끊긴 원문 줄(짧은 줄이 이어지는 경우)은 이어 붙여 읽기 좋게 한다. 글자는 그대로다.

@@ -33,6 +33,20 @@ struct ReportPDFTests {
         }
     }
 
+    @Test func confirmationsFlowIntoReport() async throws {
+        var input = try await ReportTests.input(.risky)
+        let first = try #require(input.result.verdicts.first)
+        input.confirmations = [first.id: RuleEngineTests.day]
+        let report = await ReportBuilder.build(input, narrator: nil, now: RuleEngineTests.day)
+        #expect(report.confirmedCount == 1)
+        #expect(report.sections.first?.confirmedAt == RuleEngineTests.day)
+        #expect(report.sections.dropFirst().allSatisfy { $0.confirmedAt == nil })
+        let prepared = try await AnalysisPipeline.prepare(pdf: SamplePlanRenderer.pdf(for: .risky), pageIndex: 0)
+        let text = LawText.compact((PDFDocument(data: ReportPDF.render(report, drawing: SamplePlanRenderer.pdf(for: .risky), pageIndex: 0, plan: prepared.plan))?.string as String?) ?? "")
+        #expect(text.contains("검토자확인1/\(report.sections.count)건"))
+        #expect(text.contains("검토자미확인"))
+    }
+
     @Test func rendersWithoutModelAsRuleText() async throws {
         let input = try await ReportTests.input(.noExit)
         let report = await ReportBuilder.build(input, narrator: nil, now: RuleEngineTests.day)

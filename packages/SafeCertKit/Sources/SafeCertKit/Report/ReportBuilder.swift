@@ -8,8 +8,12 @@ public struct ReportInput: Sendable {
     public var projectName: String
     public var fileName: String
     public var judgedAt: Date
+    /// 검토자 확인(판정 ID → 확인 시각).
+    public var confirmations: [String: Date]
 
-    public init(result: AnalysisResult, plan: PlanModel, snapshot: LawSnapshot, projectName: String, fileName: String, judgedAt: Date) {
+    public init(result: AnalysisResult, plan: PlanModel, snapshot: LawSnapshot, projectName: String, fileName: String, judgedAt: Date,
+                confirmations: [String: Date] = [:]) {
+        self.confirmations = confirmations
         self.result = result
         self.plan = plan
         self.snapshot = snapshot
@@ -44,7 +48,8 @@ public enum ReportBuilder {
                 if !steps.kept.isEmpty { nextSteps = ReportNarrative(sentences: steps.kept, isAI: true, dropped: steps.dropped) }
             }
             sections.append(ReportVerdictSection(number: i + 1, verdict: v, explanation: explanation,
-                                                 narrative: narrative, nextSteps: nextSteps, related: related))
+                                                 narrative: narrative, nextSteps: nextSteps, related: related,
+                                                 confirmedAt: input.confirmations[v.id]))
         }
 
         let facts = summaryFacts(r)

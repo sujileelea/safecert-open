@@ -29,6 +29,8 @@ public struct ReportVerdictSection: Hashable, Codable, Sendable, Identifiable {
     public var nextSteps: ReportNarrative
     /// 조문 검색으로 찾은 관련 구절(원문).
     public var related: [RetrievedPassage]
+    /// 검토자가 이 판정을 확인한 시각(체크). nil = 미확인.
+    public var confirmedAt: Date?
 
     public var id: String { verdict.id }
 }
@@ -49,6 +51,9 @@ public struct InspectionReport: Hashable, Codable, Sendable {
     public var notes: [String]
     /// 서술에 쓴 모델(못 쓰면 nil).
     public var model: String?
+
+    /// 검토자가 확인(체크)한 판정 수.
+    public var confirmedCount: Int { sections.filter { $0.confirmedAt != nil }.count }
 
     public static let disclaimer = "소프트웨어 사전검토 결과다. 최종 확인은 유자격 전문가가 한다."
     public static let aiNotice = "AI 작성 표시가 붙은 문장은 생성형 AI 가 판정 결과와 법령 원문만 보고 쓴 설명이다. 판정·색·수치는 AI 가 아니라 규칙 엔진이 정했다."

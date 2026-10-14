@@ -126,7 +126,7 @@ public enum ReportBuilder {
         return lines.joined(separator: "\n")
     }
 
-    /// 모델에 넣을 조문 원문 — 직접 근거 조문 + 검색 구절, 기기 내 모델 입력 크기에 맞춰 자른다.
+    /// 모델에 넣을 조문 원문 — 직접 근거 조문 + 검색 구절, 관련 부분만 남도록 길이를 자른다.
     static func passageText(_ citations: [Citation], _ related: [RetrievedPassage], limit: Int = 1400) -> String {
         var parts = citations.map { "[\($0.citation)] \(LawText.joinWrapped($0.text.components(separatedBy: "\n")))" }
         parts += related.map { "[\($0.passage.citation)] \($0.passage.text)" }

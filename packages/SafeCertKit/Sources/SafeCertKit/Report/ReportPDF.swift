@@ -530,7 +530,7 @@ final class Composer {
         if let model = report.model {
             ai.append("• 서술: \(model) — 사실·조문 대조를 통과한 AI 문장 \(report.aiSentenceCount)개를 싣고 \(report.droppedSentenceCount)개를 뺐다")
         } else {
-            ai.append("• 서술: 이 기기에서 생성형 AI 를 쓸 수 없어 규칙 엔진 문장으로 작성했다")
+            ai.append("• 서술: 생성형 AI 를 쓰지 않았거나 응답을 받지 못해 규칙 엔진 문장으로 작성했다")
         }
         ai.append("• 조문 검색: 그날 수집한 법령 전문 구절에서 판정마다 관련 구절을 찾아 AI 입력과 부록에 썼다")
         flow(Style.text(ai.joined(separator: "\n"), Style.font(9.5), Style.ink, lineSpacing: 3), after: 8)

@@ -1,7 +1,7 @@
 import Foundation
 
 /// 조문 검색(RAG) 단위 — 그날 수집한 법령 전문을 조·별표 행·고시 조 단위로 나눈 원문(공백만 정리).
-/// 보고서 생성 때 판정마다 관련 구절을 찾아 기기 내 모델에 넣고, 보고서 부록에 원문 그대로 싣는다.
+/// 보고서 생성 때 판정마다 관련 구절을 찾아 생성형 모델에 넣고, 보고서 부록에 원문 그대로 싣는다.
 public struct LawPassage: Identifiable, Hashable, Codable, Sendable {
     /// "<문서 키>#<문서 안 위치>". 문서 키 = 법령 ID 또는 "admrul.<행정규칙 ID>".
     public var id: String
@@ -17,7 +17,7 @@ public struct LawPassage: Identifiable, Hashable, Codable, Sendable {
 }
 
 public enum PassageBuilder {
-    /// 구절 하나의 최대 글자 수(기기 내 모델 입력 크기에 맞춘다).
+    /// 구절 하나의 최대 글자 수(모델 입력과 보고서 부록이 읽기 좋은 길이).
     static let maxLength = 700
 
     /// 하루치 수집 문서 → 구절. 문서·조 순서대로 결정적.

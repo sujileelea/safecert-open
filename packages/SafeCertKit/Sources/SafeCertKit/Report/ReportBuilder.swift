@@ -48,7 +48,7 @@ public enum ReportBuilder {
         let facts = summaryFacts(r)
         var summary = ReportNarrative(sentences: ExplanationComposer.narrative(r), isAI: false)
         if let narrator, let text = await narrator.summary(facts: facts) {
-            let checked = NarrativeGuard.filter(NarrativeGuard.sentences(text), facts: facts)
+            let checked = NarrativeGuard.filter(NarrativeGuard.sentences(text), facts: facts, verdicts: r.verdicts)
             if !checked.kept.isEmpty { summary = ReportNarrative(sentences: checked.kept, isAI: true, dropped: checked.dropped) }
         }
 
@@ -164,9 +164,28 @@ public enum NarrativeGuard {
             }
     }
 
-    public static func filter(_ sentences: [String], facts: String) -> (kept: [String], dropped: Int) {
-        let kept = sentences.filter { isGrounded($0, facts: facts) }
+    public static func filter(_ sentences: [String], facts: String, verdicts: [Verdict] = []) -> (kept: [String], dropped: Int) {
+        let kept = sentences.filter { isGrounded($0, facts: facts) && pairsMatch($0, verdicts: verdicts) }
         return (kept, sentences.count - kept.count)
+    }
+
+    /// 한 문장에 판정 색과 항목이 함께 나오면, 실제로 그 색을 받은 항목이어야 한다
+    /// (예: 주황은 「비상구 설치」인데 「주황 … 비상구 위치」라고 쓰면 뺀다).
+    public static func pairsMatch(_ s: String, verdicts: [Verdict]) -> Bool {
+        let colors = VerdictColor.allCases.filter { c in
+            s.contains(c.displayName) || s.contains(String(c.meaning.split(separator: " · ").first ?? ""))
+        }
+        let rules = RuleKey.allCases.filter { r in mentions(r).contains { s.contains($0) } }
+        guard !colors.isEmpty, !rules.isEmpty else { return true }
+        return colors.allSatisfy { c in verdicts.contains { $0.color == c && rules.contains($0.rule) } }
+    }
+
+    static func mentions(_ r: RuleKey) -> [String] {
+        switch r {
+        case .exitRequired: ["비상구 설치"]
+        case .exitLocation: ["위치", "이격"]
+        case .exitSize: ["규격"]
+        }
     }
 
     public static func isGrounded(_ s: String, facts: String) -> Bool {

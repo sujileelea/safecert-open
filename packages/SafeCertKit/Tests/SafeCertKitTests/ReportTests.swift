@@ -74,6 +74,16 @@ struct ReportTests {
         #expect(NarrativeGuard.sentences("확인한다(비고 2)다. 다시 확인한다\n- 현장 확인") == ["확인한다(비고 2).", "다시 확인한다.", "현장 확인."])
     }
 
+    @Test func guardRejectsWrongColorRulePairing() async throws {
+        let r = try await Self.input().result
+        // 샘플 B: 빨강 = 위치·규격, 주황 = 규격(주출입구), 초록 = 설치
+        #expect(NarrativeGuard.pairsMatch("빨강 2건은 비상구 위치와 규격이다.", verdicts: r.verdicts))
+        #expect(NarrativeGuard.pairsMatch("초록으로 표시된 비상구 설치는 확인 범위 안이다.", verdicts: r.verdicts))
+        #expect(!NarrativeGuard.pairsMatch("주황으로 표시된 1건은 비상구 위치다.", verdicts: r.verdicts))
+        #expect(!NarrativeGuard.pairsMatch("비상구 설치는 의무 미충족이다.", verdicts: r.verdicts))
+        #expect(NarrativeGuard.pairsMatch("전체 판정은 유보다.", verdicts: r.verdicts))
+    }
+
     @Test func guardRejectsColorNotInFacts() {
         let facts = "판정 색: 주황(위반 가능성 · 확인 필요)\n결과: 비상구 1개"
         #expect(NarrativeGuard.isGrounded("주황 판정이며 비상구 1개를 확인했다.", facts: facts))

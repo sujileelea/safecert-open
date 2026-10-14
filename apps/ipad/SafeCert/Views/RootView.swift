@@ -7,6 +7,7 @@ struct RootView: View {
         case project(UUID)
         case law
         case settings
+        case feedback
     }
 
     @Environment(LawStore.self) private var law
@@ -16,6 +17,9 @@ struct RootView: View {
     @State private var selection: Item?
     @State private var showingNew = false
     @State private var columns: NavigationSplitViewVisibility = .automatic
+    @State private var showingGuide = false
+    /// 첫 실행 안내를 본 적이 있는가(기기 안 설정값).
+    @AppStorage("guideSeen") private var guideSeen = false
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
@@ -33,6 +37,8 @@ struct RootView: View {
                     NavigationLink(value: Item.law) { LawRow() }
                 }
                 Section {
+                    NavigationLink(value: Item.feedback) { Label("의견 보내기", systemImage: "bubble.left.and.text.bubble.right") }
+                    Button { showingGuide = true } label: { Label("사용 안내", systemImage: "questionmark.circle") }
                     NavigationLink(value: Item.settings) { Label("설정", systemImage: "gearshape") }
                 }
             }
@@ -53,6 +59,8 @@ struct RootView: View {
                     LawStatusView()
                 case .settings:
                     SettingsView()
+                case .feedback:
+                    FeedbackView()
                 case nil:
                     HomeView { showingNew = true }
                 }
@@ -64,6 +72,17 @@ struct RootView: View {
         }
         .sheet(isPresented: $showingNew) {
             NewReviewSheet { project in selection = .project(project.id) }
+        }
+        .sheet(isPresented: $showingGuide, onDismiss: { guideSeen = true }) {
+            GuideView().presentationSizing(.page)
+        }
+        .onAppear {
+            // 처음 열 때 한 번 사용 안내(시연 실행 인자로 연 경우는 건너뛴다).
+            #if DEBUG
+            if DemoLaunch.arguments["-SafeCertDemoGuide"] != nil { showingGuide = true; return }
+            if !DemoLaunch.arguments.isEmpty { return }
+            #endif
+            if !guideSeen { showingGuide = true }
         }
         #if DEBUG
         .task {

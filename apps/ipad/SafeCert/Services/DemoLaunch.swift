@@ -8,11 +8,12 @@ import SwiftData
 /// `-SafeCertDemoFloor yes|no|unknown` `-SafeCertDemoSelect <판정 순번>`
 /// `-SafeCertDemoFile <앱 Documents 안 PDF 이름>`(+ `-SafeCertDemoStep result` 판정까지, `-SafeCertDemoMultiUse no` 다중이용업소 아님)
 /// `-SafeCertDemoStep report` = 판정 후 보고서 PDF 작성 화면까지 · `-SafeCertDemoConfirm N` = 앞 N개 판정에 검토자 확인 체크
+/// `-SafeCertDemoGuide 1` = 첫 실행 안내 · `-SafeCertDemoScreen feedback` = 의견 보내기
 enum DemoLaunch {
     static var arguments: [String: String] {
         let a = ProcessInfo.processInfo.arguments
         var out: [String: String] = [:]
-        for key in ["-SafeCertDemo", "-SafeCertDemoStep", "-SafeCertDemoScreen", "-SafeCertDemoFloor", "-SafeCertDemoSelect", "-SafeCertDemoFile", "-SafeCertDemoMultiUse", "-SafeCertDemoConfirm"] {
+        for key in ["-SafeCertDemo", "-SafeCertDemoStep", "-SafeCertDemoScreen", "-SafeCertDemoFloor", "-SafeCertDemoSelect", "-SafeCertDemoFile", "-SafeCertDemoMultiUse", "-SafeCertDemoConfirm", "-SafeCertDemoGuide"] {
             if let i = a.firstIndex(of: key), i + 1 < a.count { out[key] = a[i + 1] }
         }
         return out
@@ -22,7 +23,7 @@ enum DemoLaunch {
     static func prepare(context: ModelContext, law: LawStore) async -> RootView.Item? {
         let args = arguments
         if let screen = args["-SafeCertDemoScreen"] {
-            return screen == "law" ? .law : screen == "settings" ? .settings : nil
+            return screen == "law" ? .law : screen == "settings" ? .settings : screen == "feedback" ? .feedback : nil
         }
         if let file = args["-SafeCertDemoFile"],
            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first,

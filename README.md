@@ -12,7 +12,8 @@
 | 법령 | 매일 05:00 KST 국가법령정보 공동활용 API 실측 → 조문 정규화(독립 코드 파서 2종) → 코드 검증 5종 → 법령 스냅샷. 앱 실행·판정 직전에 당일 스냅샷이 없으면 즉시 실측 |
 | 판정 | 결정적 규칙 엔진. LLM 불관여. 판단 불가 항목은 초록 금지 |
 | 설명 | 판정 상세 7단 + 조문 원문(그날 스냅샷) 직접 삽입. 「쉬운 말 요약」은 기기 내 모델(FoundationModels) 초안 · 사실 대조 실패 시 폐기 |
-| 표시 | 전 화면 「감수 전·참고용」. 운영자 대행 시연용 |
+| 보고서 | 판정 후 **사전검토 보고서 PDF** — 판정·색·값·조문 원문은 규칙 엔진 결과 그대로, 요약·판정 설명·확인 방향은 기기 내 생성형 모델이 쓰고 근거 대조를 통과한 문장만 「AI 작성」 표시로 싣는다(아래) |
+| 표시 | 전 화면·보고서 「감수 전·참고용」 |
 
 ### 색과 법령 상태
 
@@ -27,6 +28,20 @@
 코드 검증 5종: ① 형식 ② 원문 근거(뽑은 숫자가 원문에 숫자 경계째 있고, 원문 글자로 다시 계산한 값과 같은가) ③ 이중 정규화 일치 ④ 변화 폭 ⑤ 회귀(샘플 도면 재판정 — 무관 규칙 불변 + 엄격화·완화 방향 일관).
 통과 = 새 값 반영(30일 「최근 개정」 표시) · 실패 = 이전 값 유지 + 노랑 · 문구 변경 = 자동 반영 안 함 + 노랑(원래 문구로 돌아오면 복귀) · 전면 수집 실패 = 전날 스냅샷 + 기준일 경고 · 일부 수집 실패 = 해당 조문 이전 수집본 + 「일부 수집 실패」 표식, 1시간 간격 재시도.
 
+### 사전검토 보고서 (AI)
+
+판정(규칙 엔진) → 근거 묶음 → **조문 검색(RAG)** → **기기 내 생성형 모델 서술** → **근거 대조** → PDF 조판 → 공유.
+
+| 단계 | 내용 |
+|---|---|
+| 조문 색인 | 매일 수집한 법령 전문(법·시행령·시행규칙·고시)을 조·별표 행·고시 조 단위 구절로 나눠 스냅샷에 저장 |
+| 조문 검색 | 판정마다 한글 두 글자 BM25 로 관련 구절을 찾는다(기기 안·결정적). 기기 내 모델은 한 번에 읽는 글이 짧아 법령 전문 대신 관련 구절만 넣는다 |
+| 서술 | FoundationModels 구조화 생성(요약 3~4문장 · 판정 설명 2~3문장 · 확인 방향 1~3항목), 판정마다 새 세션·탐욕 샘플링 |
+| 근거 대조 | 사실에 없는 숫자·판정 색, 색↔항목 짝 오류, 적합/부적합·벌금·단정 표현이 든 문장은 뺀다. 전부 빠지거나 모델을 못 쓰면 규칙 엔진 문장으로 채우고 모델 이름을 적지 않는다 |
+| PDF | A4 · 표지(법령 기준일·검토 범위·전체 판정·고정 문구) · 도면 표시(원본 벡터 + 판정 번호) · 판정 절(7단·조문 원문·관련 조문) · 작성 정보(AI 문장 수·뺀 수). 쪽마다 「감수 전 · 참고용」 |
+
+시뮬레이터에는 Apple 안전 분류 모델이 없어 생성이 실패한다 → 규칙 엔진 문장 보고서가 나온다. AI 서술은 Apple Intelligence 지원 iPad·Mac 에서 동작한다.
+
 ## 구조
 
 | 경로 | 내용 |
@@ -38,14 +53,15 @@
 | ├ `Law` | 법령 API · 응답 해석 · 조문 추출 · 정규화 · 코드 검증 · 스냅샷 |
 | ├ `Rules` | 규칙 엔진 · 조건 · 판정 모델 · 회귀 세트 |
 | ├ `Explain` | 판정 설명 7단 · 쉬운 말 초안 |
+| ├ `Report` | 사전검토 보고서 — 조문 검색 · 근거 묶음 · 기기 내 모델 서술 · 근거 대조 · PDF 조판 |
 | ├ `Samples` | 시연용 샘플 도면 3종(CoreGraphics 생성, 일반형·CAD 출력형) |
 | └ `Resources/LawSeed` | 법령 초기값(2026-10-12 API 응답 녹화). 첫 실행·오프라인 기준 |
-| `apps/ipad` | iPad 앱(SwiftUI · SwiftData · BackgroundTasks · Security) |
+| `apps/ipad` | iPad 앱(SwiftUI · SwiftData · PDFKit · BackgroundTasks · Security) |
 
 ## 빌드·시험
 
 ```sh
-# 로직 시험 (macOS) — 61개
+# 로직 시험 (macOS) — 78개
 cd packages/SafeCertKit && swift test
 
 # iPad 앱 빌드 (시뮬레이터)
@@ -53,7 +69,7 @@ cd apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
   -destination 'platform=iOS Simulator,name=iPad Pro 13-inch (M5)' build
 ```
 
-요구: Xcode 27 · iPadOS 26 이상. 쉬운 말 요약은 Apple Intelligence 지원 기기에서만 보인다.
+요구: Xcode 27 · iPadOS 26 이상. 쉬운 말 요약·보고서 AI 서술은 Apple Intelligence 지원 기기에서만 동작한다.
 
 ### 시연 실행 인자 (디버그 빌드 전용)
 
@@ -61,6 +77,7 @@ cd apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 |---|---|
 | `-SafeCertDemo sample-a\|sample-b\|sample-c` | 샘플 검토를 만들고(축척 확인) 판정까지 진행 |
 | `-SafeCertDemoStep confirm` | 판정 전 확인 단계에서 멈춤 |
+| `-SafeCertDemoStep report` | 판정 후 보고서 PDF 작성·미리보기까지 |
 | `-SafeCertDemoFloor yes\|no\|unknown` | 피난층 조건 |
 | `-SafeCertDemoSelect N` | N번째 판정 상세를 펼침 |
 | `-SafeCertDemoScreen law\|settings` | 법령 현황·설정 화면 |

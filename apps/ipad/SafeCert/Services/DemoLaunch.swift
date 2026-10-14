@@ -7,12 +7,12 @@ import SwiftData
 /// 실행 인자: `-SafeCertDemo sample-a|sample-b|sample-c` `-SafeCertDemoStep confirm|result` `-SafeCertDemoScreen law|settings`
 /// `-SafeCertDemoFloor yes|no|unknown` `-SafeCertDemoSelect <판정 순번>`
 /// `-SafeCertDemoFile <앱 Documents 안 PDF 이름>`(+ `-SafeCertDemoStep result` 판정까지, `-SafeCertDemoMultiUse no` 다중이용업소 아님)
-/// `-SafeCertDemoStep report` = 판정 후 보고서 PDF 작성 화면까지
+/// `-SafeCertDemoStep report` = 판정 후 보고서 PDF 작성 화면까지 · `-SafeCertDemoConfirm N` = 앞 N개 판정에 검토자 확인 체크
 enum DemoLaunch {
     static var arguments: [String: String] {
         let a = ProcessInfo.processInfo.arguments
         var out: [String: String] = [:]
-        for key in ["-SafeCertDemo", "-SafeCertDemoStep", "-SafeCertDemoScreen", "-SafeCertDemoFloor", "-SafeCertDemoSelect", "-SafeCertDemoFile", "-SafeCertDemoMultiUse"] {
+        for key in ["-SafeCertDemo", "-SafeCertDemoStep", "-SafeCertDemoScreen", "-SafeCertDemoFloor", "-SafeCertDemoSelect", "-SafeCertDemoFile", "-SafeCertDemoMultiUse", "-SafeCertDemoConfirm"] {
             if let i = a.firstIndex(of: key), i + 1 < a.count { out[key] = a[i + 1] }
         }
         return out
@@ -39,6 +39,7 @@ enum DemoLaunch {
                                                               conditions: project.conditions, snapshot: snapshot)
                     let record = AnalysisRecord(result: result)
                     record.project = project
+                    confirm(record, result: result, args: args)
                     context.insert(record)
                 }
             }
@@ -64,10 +65,17 @@ enum DemoLaunch {
                                                       conditions: project.conditions, snapshot: snapshot)
             let record = AnalysisRecord(result: result)
             record.project = project
+            confirm(record, result: result, args: args)
             context.insert(record)
         }
         try? context.save()
         return .project(project.id)
+    }
+
+    /// 시연: 앞 N개 판정에 검토자 확인 체크.
+    static func confirm(_ record: AnalysisRecord, result: AnalysisResult, args: [String: String]) {
+        guard let n = args["-SafeCertDemoConfirm"].flatMap(Int.init), n > 0 else { return }
+        for v in result.verdicts.prefix(n) { record.toggleConfirmation(v.id) }
     }
 }
 #endif

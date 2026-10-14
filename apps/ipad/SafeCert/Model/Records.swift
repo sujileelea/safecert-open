@@ -82,6 +82,8 @@ final class AnalysisRecord {
     /// 사전검토 보고서 PDF(X-01). 이 판정으로 만든 마지막 보고서.
     @Attribute(.externalStorage) var reportData: Data?
     var reportCreatedAt: Date?
+    /// 검토자 확인 체크(판정 ID → 확인 시각).
+    var confirmationsData: Data?
 
     init(result: AnalysisResult) {
         id = UUID()
@@ -92,6 +94,19 @@ final class AnalysisRecord {
     }
 
     var result: AnalysisResult? { try? JSONDecoder().decode(AnalysisResult.self, from: resultData) }
+
+    var confirmations: [String: Date] {
+        confirmationsData.flatMap { try? JSONDecoder().decode([String: Date].self, from: $0) } ?? [:]
+    }
+
+    /// 판정 하나의 확인 체크를 켜고 끈다. 확인 상태가 바뀌면 이전에 만든 보고서는 버린다(보고서에 확인 상태가 실린다).
+    func toggleConfirmation(_ verdictID: String, now: Date = Date()) {
+        var all = confirmations
+        all[verdictID] = all[verdictID] == nil ? now : nil
+        confirmationsData = try? JSONEncoder().encode(all)
+        reportData = nil
+        reportCreatedAt = nil
+    }
 }
 
 /// 법령 스냅샷 이력. 판정은 스냅샷 번호로 법령 기준을 고정한다.

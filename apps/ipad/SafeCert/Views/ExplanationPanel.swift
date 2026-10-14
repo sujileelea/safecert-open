@@ -4,12 +4,14 @@ import SwiftUI
 /// 오른쪽 텍스트 설명: 전체 요약 → 판정 카드(선택 시 7단 상세·조문 원문).
 struct ExplanationPanel: View {
     let result: AnalysisResult
+    let record: AnalysisRecord
     let plan: PlanModel
     let snapshot: LawSnapshot?
     @Binding var selectedID: String?
 
     @State private var plainDraft: String?
     @State private var drafting = false
+    @Environment(\.modelContext) private var context
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -21,7 +23,12 @@ struct ExplanationPanel: View {
                             verdict: v,
                             number: i + 1,
                             isSelected: selectedID == v.id,
-                            explanation: snapshot.map { ExplanationComposer.explain(v, result: result, plan: plan, snapshot: $0) }
+                            explanation: snapshot.map { ExplanationComposer.explain(v, result: result, plan: plan, snapshot: $0) },
+                            confirmedAt: record.confirmations[v.id],
+                            onToggleConfirm: {
+                                withAnimation(.snappy) { record.toggleConfirmation(v.id) }
+                                try? context.save()
+                            }
                         )
                         .id(v.id)
                         .onTapGesture {
@@ -59,6 +66,13 @@ struct ExplanationPanel: View {
                     }
                 }
             }
+            let confirmed = result.verdicts.filter { record.confirmations[$0.id] != nil }.count
+            HStack(spacing: 6) {
+                Image(systemName: confirmed == result.verdicts.count ? "checkmark.circle.fill" : "checklist")
+                Text(confirmed == result.verdicts.count ? "검토자 확인 완료 \(confirmed) / \(result.verdicts.count)" : "검토자 확인 \(confirmed) / \(result.verdicts.count) — 항목마다 확인 체크")
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(confirmed == result.verdicts.count ? Theme.color(.green) : Theme.color(.orange))
             Divider()
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(ExplanationComposer.narrative(result).dropFirst(), id: \.self) { line in
@@ -110,6 +124,8 @@ struct VerdictCard: View {
     let number: Int
     let isSelected: Bool
     let explanation: VerdictExplanation?
+    let confirmedAt: Date?
+    let onToggleConfirm: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -129,6 +145,18 @@ struct VerdictCard: View {
                     }
                 }
                 Spacer(minLength: 0)
+                Button(action: onToggleConfirm) {
+                    VStack(spacing: 3) {
+                        Image(systemName: confirmedAt == nil ? "square" : "checkmark.square.fill")
+                            .font(.system(size: 26))
+                            .foregroundStyle(confirmedAt == nil ? Theme.secondary : Theme.color(.green))
+                        Text(confirmedAt == nil ? "확인" : "확인함").font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(confirmedAt == nil ? Theme.secondary : Theme.color(.green))
+                    }
+                    .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(confirmedAt == nil ? "\(number)번 판정 확인 체크" : "\(number)번 판정 확인 해제")
                 Image(systemName: isSelected ? "chevron.up" : "chevron.down").foregroundStyle(Theme.secondary)
             }
             if isSelected, let explanation {

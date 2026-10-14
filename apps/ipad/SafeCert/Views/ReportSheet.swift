@@ -124,7 +124,7 @@ struct ReportSheet: View {
         failure = nil
         record.reportData = nil
         let input = ReportInput(result: result, plan: prepared.plan, snapshot: snapshot, projectName: project.name,
-                                fileName: project.fileName, judgedAt: record.createdAt)
+                                fileName: project.fileName, judgedAt: record.createdAt, confirmations: record.confirmations)
         let narrator: (any ReportNarrating)? = useAI ? KeychainStore.gemini.map { GeminiReportNarrator(client: $0) } : nil
         let report = await ReportBuilder.build(input, narrator: narrator)
         let pdf = project.pdfData, page = project.pageIndex, plan = prepared.plan

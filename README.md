@@ -12,6 +12,7 @@
 | 법령 | 매일 05:00 KST 국가법령정보 공동활용 API 실측 → 조문 정규화(독립 코드 파서 2종) → 코드 검증 5종 → 법령 스냅샷. 앱 실행·판정 직전에 당일 스냅샷이 없으면 즉시 실측 |
 | 판정 | 결정적 규칙 엔진. LLM 불관여. 판단 불가 항목은 초록 금지 |
 | 설명 | 판정 상세 7단 + 조문 원문(그날 스냅샷) 직접 삽입. 「쉬운 말 요약」은 외부 LLM 초안 · 사실 대조 실패 시 폐기 |
+| 검토자 확인 | 판정마다 확인 체크(체크 시각 기록) — 도면 표식·결과 카드·보고서에 함께 표시. 확인 상태가 바뀌면 이전 보고서는 다시 만든다 |
 | 보고서 | 판정 후 **사전검토 보고서 PDF** — 판정·색·값·조문 원문은 규칙 엔진 결과 그대로, 요약·판정 설명·확인 방향은 외부 생성형 LLM 이 쓰고 근거 대조를 통과한 문장만 「AI 작성」 표시로 싣는다(아래) |
 | 표시 | 전 화면·보고서 「감수 전·참고용」 |
 
@@ -62,7 +63,7 @@ API 키는 앱 설정에 넣으면 키체인에 보관한다(코드·저장소�
 ## 빌드·시험
 
 ```sh
-# 로직 시험 (macOS) — 83개(Gemini 실호출 1개는 GEMINI_API_KEY 가 있을 때만)
+# 로직 시험 (macOS) — 84개(Gemini 실호출 1개는 GEMINI_API_KEY 가 있을 때만)
 cd packages/SafeCertKit && swift test
 
 # iPad 앱 빌드 (시뮬레이터)
@@ -79,6 +80,7 @@ cd apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 | `-SafeCertDemo sample-a\|sample-b\|sample-c` | 샘플 검토를 만들고(축척 확인) 판정까지 진행 |
 | `-SafeCertDemoStep confirm` | 판정 전 확인 단계에서 멈춤 |
 | `-SafeCertDemoStep report` | 판정 후 보고서 PDF 작성·미리보기까지 |
+| `-SafeCertDemoConfirm N` | 앞 N개 판정에 검토자 확인 체크 |
 | `-SafeCertDemoFloor yes\|no\|unknown` | 피난층 조건 |
 | `-SafeCertDemoSelect N` | N번째 판정 상세를 펼침 |
 | `-SafeCertDemoScreen law\|settings` | 법령 현황·설정 화면 |

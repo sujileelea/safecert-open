@@ -15,6 +15,8 @@ struct DrawingCanvas: View {
     let plan: PlanModel
     let mode: Mode
     @Binding var selectedID: String?
+    /// 검토자가 확인 체크한 판정 — 표식에 초록 체크를 붙인다.
+    var confirmed: Set<String> = []
 
     @State private var rendered: RenderedPage?
     @State private var zoom: CGFloat = 1
@@ -177,6 +179,14 @@ struct DrawingCanvas: View {
                             .frame(width: 26, height: 26)
                             .background(Theme.color(item.verdict.color), in: Circle())
                             .overlay(Circle().stroke(.white, lineWidth: 2))
+                            .overlay(alignment: .topTrailing) {
+                                if confirmed.contains(item.verdict.id) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(.white, Theme.color(.green))
+                                        .offset(x: 7, y: -7)
+                                }
+                            }
                             .shadow(color: .black.opacity(selectedID == item.verdict.id ? 0.35 : 0.15), radius: 3, y: 1)
                             .scaleEffect((selectedID == item.verdict.id ? 1.25 : 1) / zoom)
                             .opacity(selectedID == nil || selectedID == item.verdict.id ? 1 : 0.55)

@@ -21,8 +21,9 @@ struct ResultView: View {
             actionBar
             GeometryReader { geo in
                 let canvas = DrawingCanvas(pdf: project.pdfData, pageIndex: project.pageIndex, plan: prepared.plan,
-                                           mode: .verdicts(result.verdicts), selectedID: $selectedID)
-                let panel = ExplanationPanel(result: result, plan: prepared.plan, snapshot: snapshot, selectedID: $selectedID)
+                                           mode: .verdicts(result.verdicts), selectedID: $selectedID,
+                                           confirmed: Set(record.confirmations.keys))
+                let panel = ExplanationPanel(result: result, record: record, plan: prepared.plan, snapshot: snapshot, selectedID: $selectedID)
                 if geo.size.width > geo.size.height {
                     // 가로: 도면 왼쪽 · 설명 오른쪽
                     HStack(spacing: 0) {

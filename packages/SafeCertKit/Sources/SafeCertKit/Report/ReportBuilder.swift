@@ -151,11 +151,17 @@ public enum NarrativeGuard {
         "안전합니다", "안전하다", "문제없", "문제가 없", "위반이다", "위반입니다", "위반한다", "위반하고 있",
     ]
 
+    /// 문장 단위로 나누고 끝맺음을 고른다(마침표 없으면 붙이고, 괄호 뒤에 붙은 「다.」는 뗀다).
     public static func sentences(_ text: String) -> [String] {
         text.replacingOccurrences(of: #"([.!?])\s+"#, with: "$1\n", options: .regularExpression)
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-•·*"))) }
             .filter { !$0.isEmpty }
+            .map { s in
+                var s = s.replacingOccurrences(of: #"\)다\.$"#, with: ").", options: .regularExpression)
+                if let last = s.last, !".!?".contains(last) { s += "." }
+                return s
+            }
     }
 
     public static func filter(_ sentences: [String], facts: String) -> (kept: [String], dropped: Int) {

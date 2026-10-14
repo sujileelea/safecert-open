@@ -70,6 +70,10 @@ struct ReportTests {
         #expect(report.sections.allSatisfy { !$0.narrative.isAI && !$0.nextSteps.isAI })
     }
 
+    @Test func sentencesNormalizeEndings() {
+        #expect(NarrativeGuard.sentences("확인한다(비고 2)다. 다시 확인한다\n- 현장 확인") == ["확인한다(비고 2).", "다시 확인한다.", "현장 확인."])
+    }
+
     @Test func guardRejectsColorNotInFacts() {
         let facts = "판정 색: 주황(위반 가능성 · 확인 필요)\n결과: 비상구 1개"
         #expect(NarrativeGuard.isGrounded("주황 판정이며 비상구 1개를 확인했다.", facts: facts))

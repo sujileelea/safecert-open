@@ -106,5 +106,5 @@ cd ../../apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 
 ## 링크
 
-- 배포(TestFlight): 0.1.0 업로드 완료(빌드 2부터 iPhone 포함) · 외부 테스트 링크 준비 중
+- 배포(TestFlight 공개 링크, iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 후 참여 가능 · 선착순 100명
 - 발표 자료: 준비 중

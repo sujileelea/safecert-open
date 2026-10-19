@@ -17,6 +17,11 @@ final class LawStore {
     private var syncTask: Task<Void, Never>?
     private(set) var lastAttempt: Date?
     private(set) var nextScheduled: Date?
+    /// 시연용 가상 법령 변경이 켜져 있는가(앱을 다시 켜면 꺼진다).
+    private(set) var demoActive = false
+    private var realCurrent: LawSnapshot?
+    /// 시연 중 판정에 쓴 가상 스냅샷(보고서가 다시 찾을 수 있게 보관, 저장소에는 넣지 않음).
+    private var demoSnapshots: [String: LawSnapshot] = [:]
 
     let container: ModelContainer
 
@@ -41,6 +46,8 @@ final class LawStore {
 
     /// 당일(KST) 실측 스냅샷이 없으면 동기화한다. 진행 중인 실측이 있으면 끝날 때까지 기다린다.
     func ensureToday() async {
+        // 시연 중에는 가상 스냅샷을 유지한다(시연을 끄면 원래대로).
+        if demoActive { return }
         if let syncTask {
             await syncTask.value
             return
@@ -73,8 +80,29 @@ final class LawStore {
         let snapshot = await AnalysisPipeline.dailySync(oc: oc, previous: current)
         save(snapshot)
         current = snapshot
+        demoActive = false
+        realCurrent = nil
         isSyncing = false
         schedule()
+    }
+
+    // MARK: 시연용 가상 법령 변경
+
+    /// 비상구 위치 기준의 조문 문구가 바뀐 상황을 가상으로 만든다. 실제 스냅샷·저장소는 그대로다.
+    func startDemoAmendment() {
+        guard !demoActive, let cur = current else { return }
+        let demo = cur.simulatingAmendment(of: .exitLocation)
+        demoSnapshots[demo.id] = demo
+        realCurrent = cur
+        current = demo
+        demoActive = true
+    }
+
+    func endDemoAmendment() {
+        guard demoActive else { return }
+        current = realCurrent ?? loadLatest()
+        realCurrent = nil
+        demoActive = false
     }
 
     /// 다음 05:00 KST 에 백그라운드 새로고침을 요청한다.
@@ -96,6 +124,7 @@ final class LawStore {
 
     func snapshot(id: String) -> LawSnapshot? {
         if current?.id == id { return current }
+        if let demo = demoSnapshots[id] { return demo }
         let d = FetchDescriptor<LawSnapshotRecord>(predicate: #Predicate { $0.snapshotID == id })
         return (try? context.fetch(d))?.first?.snapshot
     }

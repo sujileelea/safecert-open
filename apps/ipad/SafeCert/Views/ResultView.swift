@@ -65,7 +65,9 @@ struct ResultView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text("법령 기준일 \(result.lawBaseDate)").font(Theme.captionFont).foregroundStyle(Theme.secondary)
-                if let current = law.current, current.id != result.snapshotID {
+                if law.demoActive {
+                    Chip(text: "법령 변경 시연 중", tint: Theme.color(.yellow))
+                } else if let current = law.current, current.id != result.snapshotID {
                     Chip(text: "새 법령 있음", tint: Theme.color(.yellow))
                 }
             }
@@ -99,7 +101,9 @@ struct ResultView: View {
         HStack(spacing: 12) {
             Text("판정 \(record.createdAt.formatted(date: .abbreviated, time: .shortened)) · 법령 기준일 \(result.lawBaseDate)")
                 .font(Theme.captionFont).foregroundStyle(Theme.secondary)
-            if let current = law.current, current.id != result.snapshotID {
+            if law.demoActive {
+                Chip(text: "법령 변경 시연 중(가상)", tint: Theme.color(.yellow))
+            } else if let current = law.current, current.id != result.snapshotID {
                 Chip(text: "새 법령 스냅샷 \(current.baseDate) 있음", tint: Theme.color(.yellow))
             }
             Spacer()

@@ -60,6 +60,17 @@ struct SettingsView: View {
                 Text("보고서 문장을 쓸 때 판정 결과 글과 법령 조문만 보낸다. 도면 파일·이미지·검토 이름은 보내지 않는다. 무료 티어는 입력이 Google 제품 개선에 쓰일 수 있어, 보낼 때마다 확인을 받는다.")
             }
 
+            Section {
+                Toggle("법령 변경 시연(가상)", isOn: Binding(
+                    get: { law.demoActive },
+                    set: { $0 ? law.startDemoAmendment() : law.endDemoAmendment() }
+                ))
+            } header: {
+                Text("시연")
+            } footer: {
+                Text("「비상구 위치」 기준의 조문 문구가 바뀐 상황을 가상으로 만든다. 켠 뒤 결과 화면에서 「최신 법령으로 다시 판정」을 누르면 해당 항목이 노랑(기준 변경 감지)으로 바뀐다. 실제 법령과 무관하며, 끄거나 앱을 다시 켜면 원래대로 돌아간다.")
+            }
+
             Section("파일럿 범위") {
                 LabeledContent("대상", value: "다중이용업소 영업장 평면도")
                 LabeledContent("도면", value: "CAD 출력 벡터 PDF")

@@ -9,11 +9,12 @@ import SwiftData
 /// `-SafeCertDemoFile <앱 Documents 안 PDF 이름>`(+ `-SafeCertDemoStep result` 판정까지, `-SafeCertDemoMultiUse no` 다중이용업소 아님)
 /// `-SafeCertDemoStep report` = 판정 후 보고서 PDF 작성 화면까지 · `-SafeCertDemoConfirm N` = 앞 N개 판정에 검토자 확인 체크
 /// `-SafeCertDemoGuide 1` = 첫 실행 안내 · `-SafeCertDemoScreen feedback` = 의견 보내기
+/// `-SafeCertDemoAmend 1` = 시연용 가상 법령 변경을 켠 상태로 판정
 enum DemoLaunch {
     static var arguments: [String: String] {
         let a = ProcessInfo.processInfo.arguments
         var out: [String: String] = [:]
-        for key in ["-SafeCertDemo", "-SafeCertDemoStep", "-SafeCertDemoScreen", "-SafeCertDemoFloor", "-SafeCertDemoSelect", "-SafeCertDemoFile", "-SafeCertDemoMultiUse", "-SafeCertDemoConfirm", "-SafeCertDemoGuide"] {
+        for key in ["-SafeCertDemo", "-SafeCertDemoStep", "-SafeCertDemoScreen", "-SafeCertDemoFloor", "-SafeCertDemoSelect", "-SafeCertDemoFile", "-SafeCertDemoMultiUse", "-SafeCertDemoConfirm", "-SafeCertDemoGuide", "-SafeCertDemoAmend"] {
             if let i = a.firstIndex(of: key), i + 1 < a.count { out[key] = a[i + 1] }
         }
         return out
@@ -54,6 +55,7 @@ enum DemoLaunch {
             try? await Task.sleep(for: .milliseconds(200))
         }
 
+        if args["-SafeCertDemoAmend"] != nil { law.startDemoAmendment() }
         let project = ReviewProject(name: sample.title, fileName: "\(sample.id).pdf", pdfData: SamplePlanRenderer.pdf(for: sample), sampleID: sample.id)
         project.scaleConfirmed = true
         if let floor = args["-SafeCertDemoFloor"].flatMap(Tri.init(rawValue:)) {

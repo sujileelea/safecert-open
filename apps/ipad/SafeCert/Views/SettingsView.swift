@@ -26,6 +26,8 @@ struct SettingsView: View {
                         saved = false
                     }
                 }
+                // 한 행에 버튼이 둘이면 행 전체 탭이 둘 다 실행한다 — 버튼마다 따로 누르게 한다.
+                .buttonStyle(.borderless)
                 Text(law.usesSampleKey ? "현재: 공개 샘플 인증값(test) 사용 중" : "현재: 발급 인증값 사용 중(키체인 보관)")
                     .font(Theme.captionFont)
                     .foregroundStyle(law.usesSampleKey ? Theme.color(.orange) : Theme.secondary)
@@ -51,6 +53,7 @@ struct SettingsView: View {
                         hasGeminiKey = false
                     }
                 }
+                .buttonStyle(.borderless)
                 Text(hasGeminiKey ? "현재: 키 저장됨(키체인 보관) — 보고서·쉬운 말 요약에 AI 문장 사용" : "현재: 키 없음 — 보고서는 규칙 엔진 문장으로만 작성")
                     .font(Theme.captionFont)
                     .foregroundStyle(Theme.secondary)

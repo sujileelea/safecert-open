@@ -7,6 +7,12 @@
 - iPhone·iPad 에 TestFlight 앱을 설치한 뒤 위 링크를 열면 SafeCert 를 받을 수 있습니다.
 - 애플 베타 심사를 통과해 지금 바로 설치할 수 있습니다(선착순 100명).
 
+**시연 영상 (약 3분)** — 그림을 누르면 영상을 받습니다.
+
+[![SafeCert 시연 영상 — 누르면 영상(70MB)을 받습니다](docs/media/demo-video.jpg)](https://github.com/sujileelea/safecert-open/releases/download/demo-video/SafeCert-demo.mp4)
+
+iPad 화면을 처음부터 끝까지 한 번에 이어 녹화했습니다: 첫 실행 안내 → 샘플 도면 → 확인 → 판정 → 항목별 확인 체크 → AI 보고서 PDF(Google Gemini) → 법령 현황 → 법령 변경 시연(가상). [릴리스 페이지](https://github.com/sujileelea/safecert-open/releases/tag/demo-video) · [발표 자료(PDF)](docs/발표%20자료.pdf)
+
 ## 프로젝트 소개
 
 노래연습장·PC방·음식점 같은 **다중이용업소**는 문을 열기 전에 비상구 위치·크기 등 소방 안전 기준을 지켜야 합니다. 기준은 여러 법령에 나뉘어 있고 수시로 바뀌어, 설계 단계에서 놓치면 허가 단계에서 다시 설계·공사를 하게 됩니다. SafeCert 는 도면 단계에서 이 위험을 미리 찾아 줍니다.
@@ -114,8 +120,10 @@ cd ../../apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 | [기능 요구 명세서](docs/기능%20요구%20명세서.md) | 기능 · 비기능 요구사항 · 시스템 구조 · AI 활용 명세 |
 | [진행 기록](docs/진행%20기록.md) | 날짜별로 한 일과 결과 |
 | [개인정보 처리방침](docs/개인정보%20처리방침.md) | 기기 안에 두는 것 · 밖으로 보내는 것 |
+| [발표 자료](docs/발표%20자료.pdf) | 발표 자료(PDF, 21쪽) |
 
 ## 링크
 
 - 배포(TestFlight 공개 링크, iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 · 선착순 100명
-- 발표 자료: 준비 중
+- 시연 영상(약 3분): https://github.com/sujileelea/safecert-open/releases/tag/demo-video
+- 발표 자료: [docs/발표 자료.pdf](docs/발표%20자료.pdf)

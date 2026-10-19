@@ -6,7 +6,7 @@
 
 TestFlight 로 설치(iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 · 선착순 100명
 
-시연 영상(약 3분): https://github.com/sujileelea/safecert-open/releases/tag/demo-video — 저장소 첫 화면(README)에서 바로 재생
+시연 영상(약 3분): https://github.com/sujileelea/safecert-open/releases/tag/demo-video — 저장소 첫 화면(README)에 미리보기와 링크
 
 | 문서 | 내용 |
 |---|---|

@@ -1,8 +1,10 @@
 # SafeCert 제출 문서
 
-평면도(PDF)를 올리면 현행 소방 법령 기준으로 도면 위에 안전상태를 색으로 표시하고, 사람이 항목마다 확인한 뒤, AI 가 쓴 설명을 담은 검토 보고서(PDF)로 내보내는 iPad 앱.
+평면도(PDF)를 올리면 현행 소방 법령 기준으로 도면 위에 안전상태를 색으로 표시하고, 사람이 항목마다 확인한 뒤, AI 가 쓴 설명을 담은 검토 보고서(PDF)로 내보내는 iPad·iPhone 앱.
 
 코드 저장소: https://github.com/sujileelea/safecert-open
+
+TestFlight 로 설치(iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 후 참여 가능 · 선착순 100명
 
 | 문서 | 내용 |
 |---|---|

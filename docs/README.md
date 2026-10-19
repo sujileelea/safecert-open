@@ -4,7 +4,7 @@
 
 코드 저장소: https://github.com/sujileelea/safecert-open
 
-TestFlight 로 설치(iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 후 참여 가능 · 선착순 100명
+TestFlight 로 설치(iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 · 선착순 100명
 
 | 문서 | 내용 |
 |---|---|

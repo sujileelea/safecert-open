@@ -5,7 +5,7 @@
 **TestFlight 로 설치하기 (iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ**
 
 - iPhone·iPad 에 TestFlight 앱을 설치한 뒤 위 링크를 열면 SafeCert 를 받을 수 있습니다.
-- 공개 링크는 선착순 100명이며, 애플 베타 심사를 통과한 빌드부터 참여할 수 있습니다.
+- 애플 베타 심사를 통과해 지금 바로 설치할 수 있습니다(선착순 100명).
 
 ## 프로젝트 소개
 
@@ -117,5 +117,5 @@ cd ../../apps/ipad && xcodebuild -project SafeCert.xcodeproj -scheme SafeCert \
 
 ## 링크
 
-- 배포(TestFlight 공개 링크, iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 후 참여 가능 · 선착순 100명
+- 배포(TestFlight 공개 링크, iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 · 선착순 100명
 - 발표 자료: 준비 중

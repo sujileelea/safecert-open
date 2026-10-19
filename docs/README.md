@@ -6,6 +6,8 @@
 
 TestFlight 로 설치(iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ — 애플 베타 심사 통과 · 선착순 100명
 
+시연 영상(약 3분): https://github.com/sujileelea/safecert-open/releases/tag/demo-video — 저장소 첫 화면(README)에서 바로 재생
+
 | 문서 | 내용 |
 |---|---|
 | [요구사항 충족 현황](요구사항%20충족%20현황.md) | 과제 요구사항별 충족 여부 |
@@ -13,4 +15,5 @@ TestFlight 로 설치(iPad·iPhone): https://testflight.apple.com/join/7g7tebXZ 
 | [기능 요구 명세서](기능%20요구%20명세서.md) | 기능 · 비기능 요구사항 · 시스템 구조 · AI 활용 명세 |
 | [진행 기록](진행%20기록.md) | 날짜별로 한 일과 결과 |
 | [개인정보 처리방침](개인정보%20처리방침.md) | 기기 안에 두는 것 · 밖으로 보내는 것 |
+| [발표 자료](발표%20자료.pdf) | 발표 자료(PDF, 21쪽) |
 | [개발 안내](개발%20안내.md) | 코드 구조 · 빌드 · 시험 (개발자용) |

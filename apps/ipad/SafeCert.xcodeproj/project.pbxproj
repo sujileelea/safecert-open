@@ -13,12 +13,28 @@
 /* Begin PBXFileReference section */
 		5AFEC0000000000000000001 /* SafeCert.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SafeCert.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5AFEC0000000000000000013 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		5AFEC0000000000000000030 /* SafeCertUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SafeCertUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		5AFEC0000000000000000036 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5AFEC0000000000000000009 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5AFEC0000000000000000006;
+			remoteInfo = SafeCert;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5AFEC0000000000000000002 /* SafeCert */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SafeCert;
+			sourceTree = "<group>";
+		};
+		5AFEC0000000000000000031 /* SafeCertUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SafeCertUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +48,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5AFEC0000000000000000032 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -40,6 +63,7 @@
 			children = (
 				5AFEC0000000000000000013 /* Info.plist */,
 				5AFEC0000000000000000002 /* SafeCert */,
+				5AFEC0000000000000000031 /* SafeCertUITests */,
 				5AFEC0000000000000000005 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -48,6 +72,7 @@
 			isa = PBXGroup;
 			children = (
 				5AFEC0000000000000000001 /* SafeCert.app */,
+				5AFEC0000000000000000030 /* SafeCertUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -78,6 +103,27 @@
 			productReference = 5AFEC0000000000000000001 /* SafeCert.app */;
 			productType = "com.apple.product-type.application";
 		};
+		5AFEC0000000000000000035 /* SafeCertUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5AFEC0000000000000000038 /* Build configuration list for PBXNativeTarget "SafeCertUITests" */;
+			buildPhases = (
+				5AFEC0000000000000000033 /* Sources */,
+				5AFEC0000000000000000032 /* Frameworks */,
+				5AFEC0000000000000000034 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				5AFEC0000000000000000037 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5AFEC0000000000000000031 /* SafeCertUITests */,
+			);
+			name = SafeCertUITests;
+			productName = SafeCertUITests;
+			productReference = 5AFEC0000000000000000030 /* SafeCertUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -90,6 +136,10 @@
 				TargetAttributes = {
 					5AFEC0000000000000000006 = {
 						CreatedOnToolsVersion = 27.0;
+					};
+					5AFEC0000000000000000035 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 5AFEC0000000000000000006;
 					};
 				};
 			};
@@ -111,12 +161,20 @@
 			projectRoot = "";
 			targets = (
 				5AFEC0000000000000000006 /* SafeCert */,
+				5AFEC0000000000000000035 /* SafeCertUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		5AFEC0000000000000000008 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5AFEC0000000000000000034 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -133,7 +191,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5AFEC0000000000000000033 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		5AFEC0000000000000000037 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5AFEC0000000000000000006 /* SafeCert */;
+			targetProxy = 5AFEC0000000000000000036 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5AFEC0000000000000000022 /* Debug */ = {
@@ -247,6 +320,42 @@
 			};
 			name = Release;
 		};
+		5AFEC0000000000000000039 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = 53DAD6BN6X;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alnair.safecert.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SafeCert;
+			};
+			name = Debug;
+		};
+		5AFEC000000000000000003A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = 53DAD6BN6X;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.alnair.safecert.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SafeCert;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -264,6 +373,15 @@
 			buildConfigurations = (
 				5AFEC0000000000000000022 /* Debug */,
 				5AFEC0000000000000000023 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5AFEC0000000000000000038 /* Build configuration list for PBXNativeTarget "SafeCertUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5AFEC0000000000000000039 /* Debug */,
+				5AFEC000000000000000003A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
